@@ -1,0 +1,35 @@
+name: DAYFLOW Android Build
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract DAYFLOW project
+        run: |
+          mkdir source
+          unzip -q DAYFLOW_Android_Starter_v0.1.0.zip -d source
+
+      - name: Build APK
+        working-directory: source/DAYFLOW_Android_Starter
+        run: |
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAYFLOW-APK
+          path: source/DAYFLOW_Android_Starter/app/build/outputs/apk/debug/app-debug.apk
