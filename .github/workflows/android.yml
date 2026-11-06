@@ -23,6 +23,13 @@ jobs:
           mkdir source
           unzip -q DAYFLOW_Android_Starter_v0.1.0.zip -d source
 
+      - name: Fix JVM target
+        working-directory: source/DAYFLOW_Android_Starter
+        run: |
+          sed -i 's/VERSION_1_8/VERSION_17/g' app/build.gradle.kts
+          sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' app/build.gradle.kts
+          grep -n -E "VERSION_|jvmTarget|jvmToolchain" app/build.gradle.kts || true
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -30,7 +37,7 @@ jobs:
 
       - name: Build APK
         working-directory: source/DAYFLOW_Android_Starter
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
