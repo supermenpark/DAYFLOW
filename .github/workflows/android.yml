@@ -23,7 +23,7 @@ jobs:
           mkdir source
           unzip -q DAYFLOW_Android_Starter_v0.1.0.zip -d source
 
-            - name: Build APK
+      - name: Build APK
         working-directory: source/DAYFLOW_Android_Starter
         run: |
           chmod +x gradlew
