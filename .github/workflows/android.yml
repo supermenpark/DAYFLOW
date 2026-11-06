@@ -27,8 +27,10 @@ jobs:
         working-directory: source/DAYFLOW_Android_Starter
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug      - name: Upload APK
+          ./gradlew assembleDebug      
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-        name: DAYFLOW-APK
+          name: DAYFLOW-APK
           path: source/DAYFLOW_Android_Starter/app/build/outputs/apk/debug/app-debug.apk
