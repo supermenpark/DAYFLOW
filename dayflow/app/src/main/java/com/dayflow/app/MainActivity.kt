@@ -1,14 +1,11 @@
 package com.dayflow.app
 
 import android.app.Activity
-import android.app.AlarmManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.widget.Button
 import android.widget.CheckBox
@@ -39,130 +36,27 @@ class MainActivity : Activity() {
     private lateinit var chkDay1: CheckBox
     private lateinit var chkDay2: CheckBox
 
-    private val solarHolidays = mapOf(
-        "1-1" to "신정", "3-1" to "삼일절", "5-5" to "어린이날",
-        "6-6" to "현충일", "8-15" to "광복절", "10-3" to "개천절",
-        "10-9" to "한글날", "12-25" to "성탄절"
-    )
-
-    private val solarTerms = mapOf(
-        "1-5" to "소한", "1-20" to "대한", "2-4" to "입춘", "2-19" to "우수",
-        "3-5" to "경칩", "3-20" to "춘분", "4-5" to "청명", "4-20" to "곡우",
-        "5-5" to "입하", "5-21" to "소만", "6-5" to "망종", "6-21" to "하지",
-        "7-7" to "소서", "7-22" to "대서", "8-7" to "입추", "8-23" to "처서",
-        "9-7" to "백로", "9-23" to "추분", "10-8" to "한로", "10-23" to "상강",
-        "11-7" to "입동", "11-22" to "소설", "12-7" to "대설", "12-22" to "동지"
-    )
-
-    private fun key(y: Int, m: Int, d: Int): String {
-        return "m_" + y + "_" + m + "_" + d
-    }
-
-    private fun evKey(y: Int, m: Int, d: Int): String {
-        return "e_" + y + "_" + m + "_" + d
-    }
-
-    private fun prefs() = getSharedPreferences("dayflow_cal", Context.MODE_PRIVATE)
-
-    private fun lunarOf(y: Int, m: Int, d: Int): IntArray {
-        val g = Calendar.getInstance()
-        g.set(y, m - 1, d, 12, 0, 0)
-        val c = android.icu.util.ChineseCalendar()
-        c.timeInMillis = g.timeInMillis
-        val lm = c.get(android.icu.util.Calendar.MONTH) + 1
-        val ld = c.get(android.icu.util.Calendar.DAY_OF_MONTH)
-        val leap = c.get(android.icu.util.Calendar.IS_LEAP_MONTH)
-        return intArrayOf(lm, ld, leap)
-    }
-
-    private fun holidayOf(y: Int, m: Int, d: Int): String? {
-        val s = solarHolidays[m.toString() + "-" + d.toString()]
-        if (s != null) return s
-        val l = lunarOf(y, m, d)
-        if (l[2] == 0) {
-            if (l[0] == 1 && l[1] == 1) return "설날"
-            if (l[0] == 1 && l[1] == 2) return "설연휴"
-            if (l[0] == 4 && l[1] == 8) return "석가탄신일"
-            if (l[0] == 8 && l[1] == 14) return "추석연휴"
-            if (l[0] == 8 && l[1] == 15) return "추석"
-            if (l[0] == 8 && l[1] == 16) return "추석연휴"
-        }
-        val t = Calendar.getInstance()
-        t.set(y, m - 1, d, 12, 0, 0)
-        t.add(Calendar.DAY_OF_MONTH, 1)
-        val n = lunarOf(t.get(Calendar.YEAR), t.get(Calendar.MONTH) + 1, t.get(Calendar.DAY_OF_MONTH))
-        if (n[0] == 1 && n[1] == 1 && n[2] == 0) return "설연휴"
-        return null
-    }
-
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
     }
 
-    // 일정 저장 형식: 줄마다 "시|분|제목|알림코드" (알림코드: 0=당일 1=하루전 2=이틀전, 쉼표 구분)
-    private fun loadEvents(y: Int, m: Int, d: Int): MutableList<String> {
-        val raw = prefs().getString(evKey(y, m, d), "") ?: ""
-        val list = ArrayList<String>()
-        if (raw.isNotEmpty()) {
-            for (line in raw.split("\n")) {
-                if (line.isNotEmpty()) list.add(line)
-            }
-        }
-        return list
+    private fun label(s: String, size: Float, bold: Boolean): TextView {
+        val t = TextView(this)
+        t.text = s
+        t.textSize = size
+        if (bold) t.setTypeface(null, Typeface.BOLD)
+        return t
     }
 
-    private fun saveEvents(y: Int, m: Int, d: Int, list: List<String>) {
-        val e = prefs().edit()
-        if (list.isEmpty()) {
-            e.remove(evKey(y, m, d))
-        } else {
-            e.putString(evKey(y, m, d), list.joinToString("\n"))
-        }
-        e.apply()
+    private fun cellText(s: String, size: Float, color: String, bold: Boolean): TextView {
+        val t = label(s, size, bold)
+        t.gravity = Gravity.CENTER
+        t.setTextColor(Color.parseColor(color))
+        return t
     }
 
-    private fun alarmId(y: Int, m: Int, d: Int, h: Int, mi: Int, offset: Int): Int {
-        return (((y % 100) * 10000 + m * 100 + d) * 10000 + h * 100 + mi) * 3 + offset
-    }
-
-    private fun scheduleAlarm(y: Int, m: Int, d: Int, h: Int, mi: Int, offset: Int, title: String) {
-        val c = Calendar.getInstance()
-        c.set(y, m - 1, d, h, mi, 0)
-        c.set(Calendar.MILLISECOND, 0)
-        c.add(Calendar.DAY_OF_MONTH, -offset)
-        if (c.timeInMillis <= System.currentTimeMillis()) return
-
-        val label = if (offset == 0) "오늘" else if (offset == 1) "내일" else "모레"
-        val text = label + " " + h + "시 " + mi + "분 - " + title
-
-        val intent = Intent(this, AlarmReceiver::class.java)
-        intent.putExtra("title", "DAYFLOW 일정")
-        intent.putExtra("text", text)
-        val id = alarmId(y, m, d, h, mi, offset) and 0x7FFFFFFF
-        intent.putExtra("id", id)
-        val pi = PendingIntent.getBroadcast(
-            this, id, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        var exact = true
-        if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) exact = false
-        if (exact) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, c.timeInMillis, pi)
-        } else {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, c.timeInMillis, pi)
-        }
-    }
-
-    private fun cancelAlarm(y: Int, m: Int, d: Int, h: Int, mi: Int, offset: Int) {
-        val intent = Intent(this, AlarmReceiver::class.java)
-        val id = alarmId(y, m, d, h, mi, offset) and 0x7FFFFFFF
-        val pi = PendingIntent.getBroadcast(
-            this, id, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        am.cancel(pi)
+    private fun wrap(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -188,20 +82,12 @@ class MainActivity : Activity() {
         val head = LinearLayout(this)
         head.orientation = LinearLayout.HORIZONTAL
         head.gravity = Gravity.CENTER_VERTICAL
-
         val prev = Button(this)
         prev.text = "<"
         head.addView(prev)
-
-        monthTitle = TextView(this)
-        monthTitle.textSize = 22f
+        monthTitle = label("", 22f, true)
         monthTitle.gravity = Gravity.CENTER
-        monthTitle.setTypeface(null, Typeface.BOLD)
-        head.addView(
-            monthTitle,
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        )
-
+        head.addView(monthTitle, wrap())
         val next = Button(this)
         next.text = ">"
         head.addView(next)
@@ -211,13 +97,12 @@ class MainActivity : Activity() {
         week.orientation = LinearLayout.HORIZONTAL
         val names = arrayOf("일", "월", "화", "수", "목", "금", "토")
         for (i in 0..6) {
-            val w = TextView(this)
-            w.text = names[i]
-            w.gravity = Gravity.CENTER
+            var color = "#222222"
+            if (i == 0) color = "#D32F2F"
+            if (i == 6) color = "#1976D2"
+            val w = cellText(names[i], 14f, color, false)
             w.setPadding(0, dp(8), 0, dp(8))
-            if (i == 0) w.setTextColor(Color.parseColor("#D32F2F"))
-            if (i == 6) w.setTextColor(Color.parseColor("#1976D2"))
-            week.addView(w, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            week.addView(w, wrap())
         }
         root.addView(week)
 
@@ -225,16 +110,11 @@ class MainActivity : Activity() {
         gridBox.orientation = LinearLayout.VERTICAL
         root.addView(gridBox)
 
-        infoText = TextView(this)
-        infoText.textSize = 16f
+        infoText = label("", 16f, false)
         infoText.setPadding(0, dp(16), 0, dp(8))
         root.addView(infoText)
 
-        val evHeader = TextView(this)
-        evHeader.text = "일정 (길게 누르면 삭제)"
-        evHeader.textSize = 15f
-        evHeader.setTypeface(null, Typeface.BOLD)
-        root.addView(evHeader)
+        root.addView(label("일정 (길게 누르면 삭제)", 15f, true))
 
         eventBox = LinearLayout(this)
         eventBox.orientation = LinearLayout.VERTICAL
@@ -243,42 +123,30 @@ class MainActivity : Activity() {
         val timeRow = LinearLayout(this)
         timeRow.orientation = LinearLayout.HORIZONTAL
         timeRow.gravity = Gravity.CENTER_VERTICAL
-
         hourInput = EditText(this)
         hourInput.hint = "시"
-        hourInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        hourInput.inputType = InputType.TYPE_CLASS_NUMBER
         timeRow.addView(hourInput, LinearLayout.LayoutParams(dp(60), LinearLayout.LayoutParams.WRAP_CONTENT))
-
-        val colon = TextView(this)
-        colon.text = " : "
-        timeRow.addView(colon)
-
+        timeRow.addView(label(" : ", 16f, false))
         minInput = EditText(this)
         minInput.hint = "분"
-        minInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        minInput.inputType = InputType.TYPE_CLASS_NUMBER
         timeRow.addView(minInput, LinearLayout.LayoutParams(dp(60), LinearLayout.LayoutParams.WRAP_CONTENT))
-
         titleInput = EditText(this)
-        titleInput.hint = "일정 제목 (예: 영화, 면접)"
+        titleInput.hint = "일정 제목"
         titleInput.setSingleLine(true)
-        timeRow.addView(
-            titleInput,
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        )
+        timeRow.addView(titleInput, wrap())
         root.addView(timeRow)
 
         val chkRow = LinearLayout(this)
         chkRow.orientation = LinearLayout.HORIZONTAL
-
         chkSame = CheckBox(this)
         chkSame.text = "당일"
         chkSame.isChecked = true
         chkRow.addView(chkSame)
-
         chkDay1 = CheckBox(this)
         chkDay1.text = "하루 전"
         chkRow.addView(chkDay1)
-
         chkDay2 = CheckBox(this)
         chkDay2.text = "이틀 전"
         chkRow.addView(chkDay2)
@@ -288,10 +156,7 @@ class MainActivity : Activity() {
         addEv.text = "일정 추가 + 알림 예약"
         root.addView(addEv)
 
-        val memoHeader = TextView(this)
-        memoHeader.text = "메모"
-        memoHeader.textSize = 15f
-        memoHeader.setTypeface(null, Typeface.BOLD)
+        val memoHeader = label("메모", 15f, true)
         memoHeader.setPadding(0, dp(16), 0, 0)
         root.addView(memoHeader)
 
@@ -322,58 +187,45 @@ class MainActivity : Activity() {
             drawMonth()
         }
         save.setOnClickListener {
-            val text = memoInput.text.toString().trim()
-            val e = prefs().edit()
-            if (text.isEmpty()) {
-                e.remove(key(selY, selM, selD))
-            } else {
-                e.putString(key(selY, selM, selD), text)
-            }
-            e.apply()
+            Scheduler.setMemo(this, selY, selM, selD, memoInput.text.toString().trim())
             drawMonth()
             Toast.makeText(this, "메모 저장됨", Toast.LENGTH_SHORT).show()
         }
-        addEv.setOnClickListener {
-            val h = hourInput.text.toString().trim().toIntOrNull()
-            val mi = minInput.text.toString().trim().toIntOrNull()
-            val title = titleInput.text.toString().trim().replace("|", " ").replace("\n", " ")
-            if (h == null || mi == null || h < 0 || h > 23 || mi < 0 || mi > 59) {
-                Toast.makeText(this, "시(0-23)와 분(0-59)을 입력하세요", Toast.LENGTH_SHORT).show()
-            } else if (title.isEmpty()) {
-                Toast.makeText(this, "일정 제목을 입력하세요", Toast.LENGTH_SHORT).show()
-            } else {
-                val codes = ArrayList<String>()
-                if (chkSame.isChecked) codes.add("0")
-                if (chkDay1.isChecked) codes.add("1")
-                if (chkDay2.isChecked) codes.add("2")
-                for (code in codes) {
-                    scheduleAlarm(selY, selM, selD, h, mi, code.toInt(), title)
-                }
-                val list = loadEvents(selY, selM, selD)
-                list.add(h.toString() + "|" + mi + "|" + title + "|" + codes.joinToString(","))
-                saveEvents(selY, selM, selD, list)
-                hourInput.setText("")
-                minInput.setText("")
-                titleInput.setText("")
-                drawMonth()
-                showDay()
-                Toast.makeText(this, "일정과 알림이 저장됨", Toast.LENGTH_SHORT).show()
-            }
-        }
+        addEv.setOnClickListener { addEvent() }
 
         setContentView(scroll)
         drawMonth()
         showDay()
     }
 
-    private fun makeText(s: String, size: Float, color: String, bold: Boolean): TextView {
-        val t = TextView(this)
-        t.text = s
-        t.textSize = size
-        t.gravity = Gravity.CENTER
-        t.setTextColor(Color.parseColor(color))
-        if (bold) t.setTypeface(null, Typeface.BOLD)
-        return t
+    private fun addEvent() {
+        val h = hourInput.text.toString().trim().toIntOrNull()
+        val mi = minInput.text.toString().trim().toIntOrNull()
+        val title = titleInput.text.toString().trim().replace("|", " ").replace("\n", " ")
+        if (h == null || mi == null || h < 0 || h > 23 || mi < 0 || mi > 59) {
+            Toast.makeText(this, "시(0-23)와 분(0-59)을 입력하세요", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (title.isEmpty()) {
+            Toast.makeText(this, "일정 제목을 입력하세요", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val codes = ArrayList<String>()
+        if (chkSame.isChecked) codes.add("0")
+        if (chkDay1.isChecked) codes.add("1")
+        if (chkDay2.isChecked) codes.add("2")
+        for (code in codes) {
+            Scheduler.schedule(this, selY, selM, selD, h, mi, code.toInt(), title)
+        }
+        val list = Scheduler.loadEvents(this, selY, selM, selD)
+        list.add(h.toString() + "|" + mi + "|" + title + "|" + codes.joinToString(","))
+        Scheduler.saveEvents(this, selY, selM, selD, list)
+        hourInput.setText("")
+        minInput.setText("")
+        titleInput.setText("")
+        drawMonth()
+        showDay()
+        Toast.makeText(this, "일정과 알림이 저장됨", Toast.LENGTH_SHORT).show()
     }
 
     private fun drawMonth() {
@@ -401,22 +253,117 @@ class MainActivity : Activity() {
                 cell.setPadding(0, dp(6), 0, dp(6))
                 if (day in 1..daysInMonth) {
                     val d = day
-                    val l = lunarOf(year, month, d)
-                    val lunarLabel = if (l[1] == 1) {
-                        (if (l[2] == 1) "윤" else "") + l[0] + "." + l[1]
-                    } else {
-                        l[1].toString()
-                    }
-                    val hasMemo = prefs().getString(key(year, month, d), null) != null
-                    val hasEvent = loadEvents(year, month, d).isNotEmpty()
-                    val holiday = holidayOf(year, month, d)
-
+                    val holiday = CalData.holidayOf(year, month, d)
                     var color = "#222222"
                     if (col == 0 || holiday != null) color = "#D32F2F"
                     else if (col == 6) color = "#1976D2"
 
                     var mark = ""
-                    if (hasMemo) mark += "•"
-                    if (hasEvent) mark += "★"
-                    cell.addView(makeText(d.toString() + mark, 16f, color, true))
-                    cell.addView(makeText(lunarL
+                    if (Scheduler.getMemo(this, year, month, d).isNotEmpty()) mark += "•"
+                    if (Scheduler.loadEvents(this, year, month, d).isNotEmpty()) mark += "★"
+
+                    cell.addView(cellText(d.toString() + mark, 16f, color, true))
+                    cell.addView(cellText(CalData.lunarLabel(year, month, d), 10f, "#888888", false))
+                    cell.addView(cellText(holiday ?: " ", 9f, "#D32F2F", false))
+
+                    if (year == selY && month == selM && d == selD) {
+                        cell.setBackgroundColor(Color.parseColor("#FFF3C4"))
+                    } else if (year == ty && month == tm && d == td) {
+                        cell.setBackgroundColor(Color.parseColor("#E3F2FD"))
+                    }
+                    cell.setOnClickListener {
+                        selY = year
+                        selM = month
+                        selD = d
+                        drawMonth()
+                        showDay()
+                    }
+                }
+                row.addView(cell, wrap())
+                day += 1
+            }
+            gridBox.addView(row)
+        }
+    }
+
+    private fun showDay() {
+        val l = CalData.lunarOf(selY, selM, selD)
+        val c = Calendar.getInstance()
+        c.set(selY, selM - 1, selD, 12, 0, 0)
+        val names = arrayOf("일", "월", "화", "수", "목", "금", "토")
+        val dow = names[c.get(Calendar.DAY_OF_WEEK) - 1]
+
+        val sb = StringBuilder()
+        sb.append(selY).append("년 ").append(selM).append("월 ").append(selD)
+        sb.append("일 (").append(dow).append(")\n음력 ")
+        if (l[2] == 1) sb.append("윤")
+        sb.append(l[0]).append("월 ").append(l[1]).append("일")
+        val h = CalData.holidayOf(selY, selM, selD)
+        if (h != null) sb.append("\n공휴일: ").append(h)
+        val t = CalData.termOf(selM, selD)
+        if (t != null) sb.append("\n절기: ").append(t).append(" (대략적인 날짜)")
+        infoText.text = sb.toString()
+
+        memoInput.setText(Scheduler.getMemo(this, selY, selM, selD))
+        showEvents()
+    }
+
+    private fun showEvents() {
+        eventBox.removeAllViews()
+        val events = Scheduler.loadEvents(this, selY, selM, selD)
+        if (events.isEmpty()) {
+            val none = label("등록된 일정이 없어요", 14f, false)
+            none.setTextColor(Color.parseColor("#888888"))
+            none.setPadding(0, dp(4), 0, dp(4))
+            eventBox.addView(none)
+        }
+        for (i in events.indices) {
+            val parts = events[i].split("|")
+            if (parts.size < 3) continue
+            val hh = parts[0].toIntOrNull() ?: 0
+            val mm = parts[1].toIntOrNull() ?: 0
+            val codes = if (parts.size > 3) parts[3] else ""
+            val an = ArrayList<String>()
+            for (cd in codes.split(",")) {
+                if (cd == "0") an.add("당일")
+                if (cd == "1") an.add("하루 전")
+                if (cd == "2") an.add("이틀 전")
+            }
+            var line = "★ " + String.format("%02d:%02d", hh, mm) + "  " + parts[2]
+            if (an.isNotEmpty()) line += "\n    알림: " + an.joinToString(", ")
+            val tv = label(line, 15f, false)
+            tv.setPadding(dp(4), dp(6), dp(4), dp(6))
+            tv.setBackgroundColor(Color.parseColor("#FFF8E1"))
+            val idx = i
+            tv.setOnLongClickListener {
+                removeEvent(idx)
+                true
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            lp.setMargins(0, dp(3), 0, dp(3))
+            eventBox.addView(tv, lp)
+        }
+    }
+
+    private fun removeEvent(idx: Int) {
+        val cur = Scheduler.loadEvents(this, selY, selM, selD)
+        if (idx < cur.size) {
+            val p = cur[idx].split("|")
+            if (p.size > 3) {
+                val h = p[0].toIntOrNull() ?: 0
+                val mi = p[1].toIntOrNull() ?: 0
+                for (cd in p[3].split(",")) {
+                    val off = cd.toIntOrNull()
+                    if (off != null) Scheduler.cancel(this, selY, selM, selD, h, mi, off)
+                }
+            }
+            cur.removeAt(idx)
+            Scheduler.saveEvents(this, selY, selM, selD, cur)
+        }
+        drawMonth()
+        showDay()
+    }
+}
