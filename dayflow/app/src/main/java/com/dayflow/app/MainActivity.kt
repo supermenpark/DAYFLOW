@@ -64,17 +64,17 @@ class MainActivity : Activity() {
         val l = lunarOf(y, m, d)
         if (l[2] == 0) {
             if (l[0] == 1 && l[1] == 1) return "설날"
-            if (l[0] == 1 && l[1] == 2) return "설날 연휴"
-            if (l[0] == 4 && l[1] == 8) return "부처님오신날"
-            if (l[0] == 8 && l[1] == 14) return "추석 연휴"
+            if (l[0] == 1 && l[1] == 2) return "설연휴"
+            if (l[0] == 4 && l[1] == 8) return "석가탄신일"
+            if (l[0] == 8 && l[1] == 14) return "추석연휴"
             if (l[0] == 8 && l[1] == 15) return "추석"
-            if (l[0] == 8 && l[1] == 16) return "추석 연휴"
+            if (l[0] == 8 && l[1] == 16) return "추석연휴"
         }
         val t = Calendar.getInstance()
         t.set(y, m - 1, d, 12, 0, 0)
         t.add(Calendar.DAY_OF_MONTH, 1)
         val n = lunarOf(t.get(Calendar.YEAR), t.get(Calendar.MONTH) + 1, t.get(Calendar.DAY_OF_MONTH))
-        if (n[0] == 1 && n[1] == 1 && n[2] == 0) return "설날 연휴"
+        if (n[0] == 1 && n[1] == 1 && n[2] == 0) return "설연휴"
         return null
     }
 
@@ -186,6 +186,16 @@ class MainActivity : Activity() {
         showDay()
     }
 
+    private fun makeText(s: String, size: Float, color: String, bold: Boolean): TextView {
+        val t = TextView(this)
+        t.text = s
+        t.textSize = size
+        t.gravity = Gravity.CENTER
+        t.setTextColor(Color.parseColor(color))
+        if (bold) t.setTypeface(null, Typeface.BOLD)
+        return t
+    }
+
     private fun drawMonth() {
         monthTitle.text = year.toString() + "년 " + month + "월"
         gridBox.removeAllViews()
@@ -205,8 +215,9 @@ class MainActivity : Activity() {
             val row = LinearLayout(this)
             row.orientation = LinearLayout.HORIZONTAL
             for (col in 0..6) {
-                val cell = TextView(this)
-                cell.gravity = Gravity.CENTER
+                val cell = LinearLayout(this)
+                cell.orientation = LinearLayout.VERTICAL
+                cell.gravity = Gravity.CENTER_HORIZONTAL
                 cell.setPadding(0, dp(6), 0, dp(6))
                 if (day in 1..daysInMonth) {
                     val d = day
@@ -217,15 +228,15 @@ class MainActivity : Activity() {
                         l[1].toString()
                     }
                     val hasMemo = prefs().getString(key(year, month, d), null) != null
-                    val mark = if (hasMemo) " ●" else ""
-                    cell.text = d.toString() + mark + "\n" + lunarLabel
-                    cell.textSize = 14f
-
                     val holiday = holidayOf(year, month, d)
-                    var color = Color.parseColor("#222222")
-                    if (col == 0 || holiday != null) color = Color.parseColor("#D32F2F")
-                    else if (col == 6) color = Color.parseColor("#1976D2")
-                    cell.setTextColor(color)
+
+                    var color = "#222222"
+                    if (col == 0 || holiday != null) color = "#D32F2F"
+                    else if (col == 6) color = "#1976D2"
+
+                    cell.addView(makeText(d.toString() + (if (hasMemo) "•" else ""), 16f, color, true))
+                    cell.addView(makeText(lunarLabel, 10f, "#888888", false))
+                    cell.addView(makeText(holiday ?: " ", 9f, "#D32F2F", false))
 
                     if (year == selY && month == selM && d == selD) {
                         cell.setBackgroundColor(Color.parseColor("#FFF3C4"))
@@ -240,8 +251,6 @@ class MainActivity : Activity() {
                         drawMonth()
                         showDay()
                     }
-                } else {
-                    cell.text = " \n "
                 }
                 row.addView(cell, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 day += 1
