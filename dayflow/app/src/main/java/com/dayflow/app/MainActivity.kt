@@ -279,12 +279,13 @@ class MainActivity : Activity() {
         }
         frame.addView(scroll, android.widget.FrameLayout.LayoutParams(-1, -1))
         setContentView(frame)
+        
     
         
             
             
-            root.setBackgroundColor(Color.TRANSPARENT)
-        }
+        
+        
         drawMonth()
         showDay()
     }
