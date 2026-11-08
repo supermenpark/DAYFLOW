@@ -3,7 +3,12 @@ name: DAYFLOW Android Build
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - 'dayflow/**'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,17 +22,28 @@ jobs:
           java-version: '17'
 
       - name: Restore signing key
-        id: keycache
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: dayflow-debug-keystore-v1
-
-      - name: Create signing key if missing
-        if: steps.keycache.outputs.cache-hit != 'true'
+        env:
+          KEY_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
           mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "$KEY_B64" | tr -d '\n\r ' | base64 -d > ~/.android/debug.keystore
+          keytool -list -keystore ~/.android/debug.keystore -storepass dayflow123
+
+      - name: Write signing config
+        run: |
+          cat >> dayflow/app/build.gradle.kts <<EOF
+
+          android {
+              signingConfigs {
+                  getByName("debug") {
+                      storeFile = file("${HOME}/.android/debug.keystore")
+                      storePassword = "dayflow123"
+                      keyAlias = "dayflowkey"
+                      keyPassword = "dayflow123"
+                  }
+              }
+          }
+          EOF
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -37,8 +53,9 @@ jobs:
         working-directory: dayflow
         run: gradle assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
         with:
-          name: DAYFLOW-APK
-          path: dayflow/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          tag_name: latest
+          name: DAYFLOW latest
+          files: dayflow/app/build/outputs/apk/debug/app-debug.apk
