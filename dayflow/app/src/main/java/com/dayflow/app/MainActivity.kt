@@ -41,13 +41,16 @@ class MainActivity : Activity() {
     private lateinit var minInput: EditText
     private lateinit var chkSame: CheckBox
     private lateinit var chkDay1: CheckBox
-    private lateinit var chkDay2: CheckBox
+    private lateinit var chkDay2: CheckBox 
         private fun applyBg() {
         val d = BgImage.drawable(this)
         if (d != null) {
-            findViewById<android.view.View>(android.R.id.content).background = d
+            d.alpha = 110
+            window.setBackgroundDrawable(d)
         }
-    }
+        }
+
+    
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
