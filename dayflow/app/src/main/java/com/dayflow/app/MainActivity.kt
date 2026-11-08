@@ -14,6 +14,10 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.Spinner
+import android.widget.ArrayAdapter
+import android.widget.AdapterView
+import android.view.View
 import java.util.Calendar
 
 class MainActivity : Activity() {
@@ -78,6 +82,23 @@ class MainActivity : Activity() {
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(12), dp(32), dp(12), dp(24))
         scroll.addView(root)
+                root.setBackgroundColor(Color.parseColor(Theme.bg(this)))
+        scroll.setBackgroundColor(Color.parseColor(Theme.bg(this)))
+        scroll.addView(root)
+
+        val themeSpin = Spinner(this)
+        themeSpin.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Theme.names)
+        themeSpin.setSelection(Theme.get(this))
+        themeSpin.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                if (pos != Theme.get(this@MainActivity)) {
+                    Theme.set(this@MainActivity, pos)
+                    recreate()
+                }
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+        root.addView(themeSpin)
 
         val head = LinearLayout(this)
         head.orientation = LinearLayout.HORIZONTAL
