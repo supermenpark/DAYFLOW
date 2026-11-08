@@ -1,0 +1,21 @@
+name: Make Key
+
+on:
+  workflow_dispatch:
+
+jobs:
+  key:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate keystore
+        run: |
+          keytool -genkey -keystore k.jks -storepass dayflow123 -alias dayflowkey -keypass dayflow123 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=DAYFLOW,O=DAYFLOW,C=KR"
+          base64 -w0 k.jks > k.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DAYFLOW-KEY
+          path: k.txt
