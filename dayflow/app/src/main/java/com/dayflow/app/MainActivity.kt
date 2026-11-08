@@ -81,8 +81,8 @@ class MainActivity : Activity() {
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(12), dp(32), dp(12), dp(24))
-        scroll.addView(root)
-                root.setBackgroundColor(Color.parseColor(Theme.bg(this)))
+   
+        root.setBackgroundColor(Color.parseColor(Theme.bg(this)))
         scroll.setBackgroundColor(Color.parseColor(Theme.bg(this)))
         scroll.addView(root)
 
