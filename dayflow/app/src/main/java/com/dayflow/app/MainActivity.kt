@@ -18,6 +18,9 @@ import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.view.View
+import android.content.Intent
+import android.net.Uri
+
 import java.util.Calendar
 
 class MainActivity : Activity() {
@@ -39,6 +42,24 @@ class MainActivity : Activity() {
     private lateinit var chkSame: CheckBox
     private lateinit var chkDay1: CheckBox
     private lateinit var chkDay2: CheckBox
+        private fun applyBg() {
+        val d = BgImage.drawable(this)
+        if (d != null) {
+            findViewById<android.view.View>(android.R.id.content).background = d
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 77 && resultCode == RESULT_OK && data != null) {
+            val u: Uri? = data.data
+            if (u != null && BgImage.save(this, u)) {
+                recreate()
+            } else {
+                Toast.makeText(this, "사진을 불러오지 못했어요", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
@@ -99,6 +120,24 @@ class MainActivity : Activity() {
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
         root.addView(themeSpin)
+                val bgRow = LinearLayout(this)
+        bgRow.orientation = LinearLayout.HORIZONTAL
+        val bgPick = Button(this)
+        bgPick.text = "배경 사진 선택"
+        bgPick.setOnClickListener {
+            val i = Intent(Intent.ACTION_GET_CONTENT)
+            i.type = "image/*"
+            startActivityForResult(i, 77)
+        }
+        bgRow.addView(bgPick, wrap())
+        val bgClear = Button(this)
+        bgClear.text = "배경 지우기"
+        bgClear.setOnClickListener {
+            BgImage.clear(this)
+            recreate()
+        }
+        bgRow.addView(bgClear, wrap())
+        root.addView(bgRow)
 
         val head = LinearLayout(this)
         head.orientation = LinearLayout.HORIZONTAL
@@ -215,6 +254,7 @@ class MainActivity : Activity() {
         addEv.setOnClickListener { addEvent() }
 
         setContentView(scroll)
+                applyBg()
         drawMonth()
         showDay()
     }
