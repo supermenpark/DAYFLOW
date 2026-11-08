@@ -257,10 +257,32 @@ class MainActivity : Activity() {
         addEv.setOnClickListener { addEvent() }
 
         setContentView(scroll)
-                val bgd = BgImage.drawable(this)
+                Ui.style(this, prev, 0)
+        Ui.style(this, next, 0)
+        Ui.style(this, bgPick, 1)
+        Ui.style(this, bgClear, 4)
+        Ui.style(this, addEv, 2)
+        Ui.style(this, save, 3)
+
+        val frame = android.widget.FrameLayout(this)
+        val bgd = BgImage.drawable(this)
         if (bgd != null) {
+            val bgView = android.widget.ImageView(this)
+            bgView.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
             bgd.alpha = 140
-            scroll.background = bgd
+            bgView.setImageDrawable(bgd)
+            frame.addView(bgView, android.widget.FrameLayout.LayoutParams(-1, -1))
+            scroll.setBackgroundColor(Color.TRANSPARENT)
+            root.setBackgroundColor(Color.TRANSPARENT)
+        } else {
+            frame.setBackgroundColor(Color.parseColor(Theme.bg(this)))
+        }
+        frame.addView(scroll, android.widget.FrameLayout.LayoutParams(-1, -1))
+        setContentView(frame)
+    
+        
+            
+            
             root.setBackgroundColor(Color.TRANSPARENT)
         }
         drawMonth()
