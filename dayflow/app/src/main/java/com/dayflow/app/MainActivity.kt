@@ -257,7 +257,12 @@ class MainActivity : Activity() {
         addEv.setOnClickListener { addEvent() }
 
         setContentView(scroll)
-                applyBg()
+                val bgd = BgImage.drawable(this)
+        if (bgd != null) {
+            bgd.alpha = 140
+            scroll.background = bgd
+            root.setBackgroundColor(Color.TRANSPARENT)
+        }
         drawMonth()
         showDay()
     }
