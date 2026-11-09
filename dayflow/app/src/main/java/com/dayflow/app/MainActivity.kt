@@ -1,26 +1,27 @@
 package com.dayflow.app
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.Spinner
-import android.widget.ArrayAdapter
-import android.widget.AdapterView
-import android.view.View
-import android.content.Intent
-import android.net.Uri
-
 import java.util.Calendar
 
 class MainActivity : Activity() {
@@ -41,28 +42,7 @@ class MainActivity : Activity() {
     private lateinit var minInput: EditText
     private lateinit var chkSame: CheckBox
     private lateinit var chkDay1: CheckBox
-    private lateinit var chkDay2: CheckBox 
-        private fun applyBg() {
-        val d = BgImage.drawable(this)
-        if (d != null) {
-            d.alpha = 110
-            window.setBackgroundDrawable(d)
-        }
-        }
-
-    
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 77 && resultCode == RESULT_OK && data != null) {
-            val u: Uri? = data.data
-            if (u != null && BgImage.save(this, u)) {
-                recreate()
-            } else {
-                Toast.makeText(this, "사진을 불러오지 못했어요", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+    private lateinit var chkDay2: CheckBox
 
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
@@ -87,8 +67,37 @@ class MainActivity : Activity() {
         return LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 77 && resultCode == RESULT_OK && data != null) {
+            val u: Uri? = data.data
+            if (u != null && BgImage.save(this, u)) {
+                recreate()
+            } else {
+                Toast.makeText(this, "사진을 불러오지 못했어요", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val crashPrefs = getSharedPreferences("crash", MODE_PRIVATE)
+        val crash = crashPrefs.getString("msg", null)
+        if (crash != null) {
+            crashPrefs.edit().clear().commit()
+            val tv = TextView(this)
+            tv.text = crash
+            tv.setPadding(40, 100, 40, 40)
+            setContentView(tv)
+            return
+        }
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
+            val st = e.stackTrace.take(8).joinToString("\n")
+            getSharedPreferences("crash", MODE_PRIVATE).edit()
+                .putString("msg", e.toString() + "\n" + st).commit()
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }
 
         if (Build.VERSION.SDK_INT >= 33) {
             requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
@@ -105,13 +114,12 @@ class MainActivity : Activity() {
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(12), dp(32), dp(12), dp(24))
-   
-        root.setBackgroundColor(Color.parseColor(Theme.bg(this)))
-        scroll.setBackgroundColor(Color.parseColor(Theme.bg(this)))
         scroll.addView(root)
 
         val themeSpin = Spinner(this)
-        themeSpin.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Theme.names)
+        themeSpin.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item, Theme.names
+        )
         themeSpin.setSelection(Theme.get(this))
         themeSpin.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
@@ -123,7 +131,8 @@ class MainActivity : Activity() {
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
         root.addView(themeSpin)
-                val bgRow = LinearLayout(this)
+
+        val bgRow = LinearLayout(this)
         bgRow.orientation = LinearLayout.HORIZONTAL
         val bgPick = Button(this)
         bgPick.text = "배경 사진 선택"
@@ -227,6 +236,8 @@ class MainActivity : Activity() {
         memoInput.hint = "이 날의 메모"
         memoInput.minLines = 3
         memoInput.gravity = Gravity.TOP
+        memoInput.setBackgroundColor(Color.parseColor(Theme.card(this)))
+        memoInput.setPadding(dp(12), dp(12), dp(12), dp(12))
         root.addView(memoInput)
 
         val save = Button(this)
@@ -256,36 +267,27 @@ class MainActivity : Activity() {
         }
         addEv.setOnClickListener { addEvent() }
 
-        setContentView(scroll)
-                Ui.style(this, prev, 0)
+        Ui.style(this, prev, 0)
         Ui.style(this, next, 0)
         Ui.style(this, bgPick, 1)
         Ui.style(this, bgClear, 4)
         Ui.style(this, addEv, 2)
         Ui.style(this, save, 3)
 
-        val frame = android.widget.FrameLayout(this)
+        val frame = FrameLayout(this)
         val bgd = BgImage.drawable(this)
         if (bgd != null) {
-            val bgView = android.widget.ImageView(this)
-            bgView.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            val bgView = ImageView(this)
+            bgView.scaleType = ImageView.ScaleType.CENTER_CROP
             bgd.alpha = 140
             bgView.setImageDrawable(bgd)
-            frame.addView(bgView, android.widget.FrameLayout.LayoutParams(-1, -1))
-            scroll.setBackgroundColor(Color.TRANSPARENT)
-            root.setBackgroundColor(Color.TRANSPARENT)
+            frame.addView(bgView, FrameLayout.LayoutParams(-1, -1))
         } else {
             frame.setBackgroundColor(Color.parseColor(Theme.bg(this)))
         }
-        frame.addView(scroll, android.widget.FrameLayout.LayoutParams(-1, -1))
+        frame.addView(scroll, FrameLayout.LayoutParams(-1, -1))
         setContentView(frame)
-        
-    
-        
-            
-            
-        
-        
+
         drawMonth()
         showDay()
     }
@@ -358,6 +360,9 @@ class MainActivity : Activity() {
                     cell.addView(cellText(CalData.lunarLabel(year, month, d), 10f, "#888888", false))
                     cell.addView(cellText(holiday ?: " ", 9f, "#D32F2F", false))
 
+                    if (mark.isNotEmpty()) {
+                        cell.setBackgroundColor(Color.parseColor(Theme.card(this)))
+                    }
                     if (year == selY && month == selM && d == selD) {
                         cell.setBackgroundColor(Color.parseColor("#FFF3C4"))
                     } else if (year == ty && month == tm && d == td) {
