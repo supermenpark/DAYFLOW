@@ -206,7 +206,46 @@ class MainActivity : Activity() {
             frame.setBackgroundColor(Color.parseColor(Theme.bg(this)))
         }
         frame.addView(scroll, FrameLayout.LayoutParams(-1, -1))
-        setContentView(frame)
+                val pages = FrameLayout(this)
+        val homeV = HomeView.build(this)
+        val memoV = HomeView.placeholder(this, "메모")
+        val musicV = HomeView.placeholder(this, "음악")
+        val myV = HomeView.placeholder(this, "MY")
+        pages.addView(homeV, FrameLayout.LayoutParams(-1, -1))
+        pages.addView(frame, FrameLayout.LayoutParams(-1, -1))
+        pages.addView(memoV, FrameLayout.LayoutParams(-1, -1))
+        pages.addView(musicV, FrameLayout.LayoutParams(-1, -1))
+        pages.addView(myV, FrameLayout.LayoutParams(-1, -1))
+        val all = arrayOf<View>(homeV, frame, memoV, musicV, myV)
+
+        val bar = LinearLayout(this)
+        bar.orientation = LinearLayout.HORIZONTAL
+        bar.setBackgroundColor(Color.parseColor("#FFFFFF"))
+        val tabNames = arrayOf("홈", "달력", "메모", "음악", "MY")
+        val tabs = ArrayList<TextView>()
+        for (i in 0..4) {
+            val t = label(tabNames[i], 14f, true)
+            t.gravity = Gravity.CENTER
+            t.setPadding(0, dp(14), 0, dp(14))
+            bar.addView(t, wrap())
+            tabs.add(t)
+            t.setOnClickListener {
+                for (j in 0..4) {
+                    all[j].visibility = if (j == i) View.VISIBLE else View.GONE
+                    tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
+                }
+            }
+        }
+        for (j in 0..4) {
+            all[j].visibility = if (j == 1) View.VISIBLE else View.GONE
+            tabs[j].setTextColor(Color.parseColor(if (j == 1) "#1976D2" else "#888888"))
+        }
+
+        val outer = LinearLayout(this)
+        outer.orientation = LinearLayout.VERTICAL
+        outer.addView(pages, LinearLayout.LayoutParams(-1, 0, 1f))
+        outer.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        setContentView(outer)
 
         ready = true
         drawMonth()
