@@ -252,6 +252,7 @@ class MainActivity : Activity() {
 
         ready = true
         drawMonth()
+                Weather.refresh(this) { runOnUiThread { drawMonth() } }
     }
 
     private fun drawMonth() {
