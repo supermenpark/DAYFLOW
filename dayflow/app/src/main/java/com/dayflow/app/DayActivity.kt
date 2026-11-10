@@ -89,6 +89,7 @@ class DayActivity : Activity() {
         total.setTextColor(Color.parseColor("#B8860B"))
         card.addView(total)
         card.addView(label(Fortune.message(y, m, d), 15f, false))
+                card.addView(label("날씨: " + Weather.detail(this, y, m, d), 15f, false))
         val detail = "금전운 " + Fortune.score(y, m, d, 1) + "점   사업운 " + Fortune.score(y, m, d, 2) +
             "점\n애정운 " + Fortune.score(y, m, d, 3) + "점   건강운 " + Fortune.score(y, m, d, 4) +
             "점\n행운의 숫자 " + Fortune.lucky(y, m, d)
