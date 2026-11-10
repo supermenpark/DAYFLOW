@@ -67,7 +67,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (ready) drawMonth()
+              if (ready) {
+            drawMonth()
+            Weather.refresh(this) { runOnUiThread { drawMonth() } }
+              }  
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -288,7 +291,8 @@ class MainActivity : Activity() {
                     cell.addView(cellText(CalData.lunarLabel(year, month, d), 10f, "#888888", false))
                     cell.addView(cellText(Fortune.score(year, month, d, 0).toString(), 11f, "#B8860B", true))
                     cell.addView(cellText(if (hasEvent) "●" else " ", 10f, "#E53935", false))
-
+                    
+                    cell.addView(cellText(Weather.label(this, year, month, d), 10f, "#1976D2", false))
                     if (hasMemo) {
                         cell.setBackgroundColor(Color.parseColor(Theme.card(this)))
                     }
