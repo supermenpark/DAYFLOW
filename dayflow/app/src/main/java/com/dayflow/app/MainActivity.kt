@@ -211,7 +211,7 @@ class MainActivity : Activity() {
         frame.addView(scroll, FrameLayout.LayoutParams(-1, -1))
                 val pages = FrameLayout(this)
         val homeV = HomeView.build(this)
-        val memoV = HomeView.placeholder(this, "메모")
+                val memoV = MemoView.build(this)
         val musicV = HomeView.placeholder(this, "음악")
         val myV = HomeView.placeholder(this, "MY")
         pages.addView(homeV, FrameLayout.LayoutParams(-1, -1))
