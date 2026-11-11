@@ -3,10 +3,11 @@ package com.dayflow.app
 import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
-import android.widget.Button
+import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -34,12 +35,43 @@ class DayActivity : Activity() {
         return (v * resources.displayMetrics.density).toInt()
     }
 
-    private fun label(s: String, size: Float, bold: Boolean): TextView {
+    private fun label(s: String, size: Float, bold: Boolean, color: String): TextView {
         val t = TextView(this)
         t.text = s
         t.textSize = size
+        t.setTextColor(Color.parseColor(color))
         if (bold) t.setTypeface(null, Typeface.BOLD)
         return t
+    }
+
+    private fun round(color: String, r: Int): GradientDrawable {
+        val g = GradientDrawable()
+        g.setColor(Color.parseColor(color))
+        g.cornerRadius = dp(r).toFloat()
+        return g
+    }
+
+    private fun card(): LinearLayout {
+        val c = LinearLayout(this)
+        c.orientation = LinearLayout.VERTICAL
+        c.background = round("#FFFFFF", 18)
+        c.elevation = dp(3).toFloat()
+        c.setPadding(dp(16), dp(14), dp(16), dp(14))
+        return c
+    }
+
+    private fun addCard(root: LinearLayout, c: View) {
+        val lp = LinearLayout.LayoutParams(-1, -2)
+        lp.setMargins(dp(14), 0, dp(14), dp(12))
+        root.addView(c, lp)
+    }
+
+    private fun button(text: String, color: String): TextView {
+        val b = label(text, 15f, true, "#FFFFFF")
+        b.gravity = Gravity.CENTER
+        b.background = round(color, 14)
+        b.setPadding(0, dp(13), 0, dp(13))
+        return b
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,17 +81,10 @@ class DayActivity : Activity() {
         d = intent.getIntExtra("d", 1)
 
         val scroll = ScrollView(this)
-        scroll.setBackgroundColor(Color.parseColor(Theme.bg(this)))
+        scroll.setBackgroundColor(Color.parseColor("#F4F7FB"))
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setPadding(dp(16), dp(32), dp(16), dp(24))
         scroll.addView(root)
-
-        val back = Button(this)
-        back.text = "← 달력으로"
-        back.setOnClickListener { finish() }
-        Ui.style(this, back, 0)
-        root.addView(back)
 
         val c = Calendar.getInstance()
         c.set(y, m - 1, d, 12, 0, 0)
@@ -67,43 +92,60 @@ class DayActivity : Activity() {
         val dow = names[c.get(Calendar.DAY_OF_WEEK) - 1]
         val l = CalData.lunarOf(y, m, d)
 
-        val head = label(y.toString() + "년 " + m + "월 " + d + "일 (" + dow + ")", 22f, true)
-        head.setPadding(0, dp(12), 0, dp(4))
-        root.addView(head)
-
-        val sb = StringBuilder("음력 ")
+        val header = LinearLayout(this)
+        header.orientation = LinearLayout.VERTICAL
+        header.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#6FB7F2"), Color.parseColor("#A9D8F8"))
+        )
+        header.setPadding(dp(18), dp(36), dp(18), dp(40))
+        val back = label("‹ 달력으로", 15f, true, "#FFFFFF")
+        back.setPadding(0, 0, 0, dp(10))
+        back.setOnClickListener { finish() }
+        header.addView(back)
+        header.addView(label(m.toString() + "월 " + d + "일 " + dow + "요일", 26f, true, "#FFFFFF"))
+        val sb = StringBuilder(y.toString() + "년  ·  음력 ")
         if (l[2] == 1) sb.append("윤")
         sb.append(l[0]).append("월 ").append(l[1]).append("일")
         val h = CalData.holidayOf(y, m, d)
         if (h != null) sb.append("  ·  ").append(h)
         val t = CalData.termOf(m, d)
-        if (t != null) sb.append("  ·  절기 ").append(t)
-        root.addView(label(sb.toString(), 15f, false))
+        if (t != null) sb.append("  ·  ").append(t)
+        header.addView(label(sb.toString(), 13f, false, "#EAF5FF"))
+        root.addView(header, LinearLayout.LayoutParams(-1, -2))
 
-        val card = LinearLayout(this)
-        card.orientation = LinearLayout.VERTICAL
-        card.setBackgroundColor(Color.parseColor(Theme.card(this)))
-        card.setPadding(dp(16), dp(14), dp(16), dp(14))
-        card.addView(label("오늘의 운세 (샘플 점수)", 15f, true))
-        val total = label(Fortune.score(y, m, d, 0).toString() + "점", 34f, true)
-        total.setTextColor(Color.parseColor("#B8860B"))
-        card.addView(total)
-        card.addView(label(Fortune.message(y, m, d), 15f, false))
-                card.addView(label("날씨: " + Weather.detail(this, y, m, d), 15f, false))
-        val detail = "금전운 " + Fortune.score(y, m, d, 1) + "점   사업운 " + Fortune.score(y, m, d, 2) +
-            "점\n애정운 " + Fortune.score(y, m, d, 3) + "점   건강운 " + Fortune.score(y, m, d, 4) +
-            "점\n행운의 숫자 " + Fortune.lucky(y, m, d)
-        val dt = label(detail, 15f, false)
+        val spacer = View(this)
+        root.addView(spacer, LinearLayout.LayoutParams(-1, dp(-20)))
+
+        val fc = card()
+        val fr = LinearLayout(this)
+        fr.orientation = LinearLayout.HORIZONTAL
+        fr.gravity = Gravity.CENTER_VERTICAL
+        val fl = LinearLayout(this)
+        fl.orientation = LinearLayout.VERTICAL
+        fl.addView(label("오늘의 운세 (샘플)", 13f, false, "#777777"))
+        fl.addView(label(Fortune.message(y, m, d), 14f, false, "#333333"))
+        fr.addView(fl, LinearLayout.LayoutParams(0, -2, 1f))
+        fr.addView(label(Fortune.score(y, m, d, 0).toString() + "점", 28f, true, "#6A3DE8"))
+        fc.addView(fr)
+        val dt = label(
+            "금전 " + Fortune.score(y, m, d, 1) + "   사업 " + Fortune.score(y, m, d, 2) +
+                "   애정 " + Fortune.score(y, m, d, 3) + "   건강 " + Fortune.score(y, m, d, 4) +
+                "\n행운의 숫자 " + Fortune.lucky(y, m, d),
+            13f, false, "#555555"
+        )
         dt.setPadding(0, dp(8), 0, 0)
-        card.addView(dt)
-        val lp = LinearLayout.LayoutParams(-1, -2)
-        lp.setMargins(0, dp(12), 0, dp(12))
-        root.addView(card, lp)
+        fc.addView(dt)
+        val wl = label("☀ " + Weather.detail(this, y, m, d), 14f, false, "#1976D2")
+        wl.setPadding(0, dp(8), 0, 0)
+        fc.addView(wl)
+        addCard(root, fc)
 
-        root.addView(label("일정 (길게 누르면 삭제)", 16f, true))
+        val ec = card()
+        ec.addView(label("일정", 16f, true, "#222222"))
         eventBox = LinearLayout(this)
         eventBox.orientation = LinearLayout.VERTICAL
-        root.addView(eventBox)
+        ec.addView(eventBox)
 
         val timeRow = LinearLayout(this)
         timeRow.orientation = LinearLayout.HORIZONTAL
@@ -111,17 +153,17 @@ class DayActivity : Activity() {
         hourInput = EditText(this)
         hourInput.hint = "시"
         hourInput.inputType = InputType.TYPE_CLASS_NUMBER
-        timeRow.addView(hourInput, LinearLayout.LayoutParams(dp(60), -2))
-        timeRow.addView(label(" : ", 16f, false))
+        timeRow.addView(hourInput, LinearLayout.LayoutParams(dp(56), -2))
+        timeRow.addView(label(" : ", 16f, false, "#333333"))
         minInput = EditText(this)
         minInput.hint = "분"
         minInput.inputType = InputType.TYPE_CLASS_NUMBER
-        timeRow.addView(minInput, LinearLayout.LayoutParams(dp(60), -2))
+        timeRow.addView(minInput, LinearLayout.LayoutParams(dp(56), -2))
         titleInput = EditText(this)
         titleInput.hint = "일정 제목"
         titleInput.setSingleLine(true)
         timeRow.addView(titleInput, LinearLayout.LayoutParams(0, -2, 1f))
-        root.addView(timeRow)
+        ec.addView(timeRow)
 
         val chkRow = LinearLayout(this)
         chkRow.orientation = LinearLayout.HORIZONTAL
@@ -135,34 +177,35 @@ class DayActivity : Activity() {
         chkDay2 = CheckBox(this)
         chkDay2.text = "이틀 전"
         chkRow.addView(chkDay2)
-        root.addView(chkRow)
+        ec.addView(chkRow)
 
-        val addEv = Button(this)
-        addEv.text = "일정 추가 + 알림 예약"
+        val addEv = button("일정 추가 + 알림 예약", "#2F7BE8")
         addEv.setOnClickListener { addEvent() }
-        Ui.style(this, addEv, 2)
-        root.addView(addEv)
+        ec.addView(addEv)
+        addCard(root, ec)
 
-        val mh = label("메모", 16f, true)
-        mh.setPadding(0, dp(16), 0, 0)
-        root.addView(mh)
+        val mc = card()
+        mc.addView(label("메모", 16f, true, "#222222"))
         memoInput = EditText(this)
         memoInput.hint = "이 날의 메모"
-        memoInput.minLines = 3
+        memoInput.minLines = 4
         memoInput.gravity = Gravity.TOP
-        memoInput.setBackgroundColor(Color.parseColor(Theme.card(this)))
+        memoInput.background = round("#FFF6CC", 12)
         memoInput.setPadding(dp(12), dp(12), dp(12), dp(12))
         memoInput.setText(Scheduler.getMemo(this, y, m, d))
-        root.addView(memoInput)
-
-        val save = Button(this)
-        save.text = "메모 저장"
+        val mlp = LinearLayout.LayoutParams(-1, -2)
+        mlp.setMargins(0, dp(8), 0, dp(10))
+        mc.addView(memoInput, mlp)
+        val save = button("메모 저장", "#6A3DE8")
         save.setOnClickListener {
             Scheduler.setMemo(this, y, m, d, memoInput.text.toString().trim())
             Toast.makeText(this, "메모 저장됨", Toast.LENGTH_SHORT).show()
         }
-        Ui.style(this, save, 3)
-        root.addView(save)
+        mc.addView(save)
+        addCard(root, mc)
+
+        val pad = View(this)
+        root.addView(pad, LinearLayout.LayoutParams(-1, dp(20)))
 
         setContentView(scroll)
         showEvents()
@@ -201,9 +244,8 @@ class DayActivity : Activity() {
         eventBox.removeAllViews()
         val events = Scheduler.loadEvents(this, y, m, d)
         if (events.isEmpty()) {
-            val none = label("등록된 일정이 없어요", 14f, false)
-            none.setTextColor(Color.parseColor("#888888"))
-            none.setPadding(0, dp(4), 0, dp(4))
+            val none = label("등록된 일정이 없어요", 14f, false, "#999999")
+            none.setPadding(0, dp(6), 0, dp(6))
             eventBox.addView(none)
         }
         for (i in events.indices) {
@@ -219,17 +261,17 @@ class DayActivity : Activity() {
                 if (cd == "2") an.add("이틀 전")
             }
             var line = "● " + String.format("%02d:%02d", hh, mm) + "  " + parts[2]
-            if (an.isNotEmpty()) line += "\n    알림: " + an.joinToString(", ")
-            val tv = label(line, 15f, false)
-            tv.setPadding(dp(8), dp(8), dp(8), dp(8))
-            tv.setBackgroundColor(Color.parseColor("#FFF8E1"))
+            if (an.isNotEmpty()) line += "\n    알림 " + an.joinToString(", ") + "  (길게 누르면 삭제)"
+            val tv = label(line, 15f, false, "#222222")
+            tv.background = round("#EAF3FF", 10)
+            tv.setPadding(dp(12), dp(10), dp(12), dp(10))
             val idx = i
             tv.setOnLongClickListener {
                 removeEvent(idx)
                 true
             }
             val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, dp(3), 0, dp(3))
+            lp.setMargins(0, dp(4), 0, dp(4))
             eventBox.addView(tv, lp)
         }
     }
