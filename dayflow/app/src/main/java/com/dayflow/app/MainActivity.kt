@@ -249,7 +249,7 @@ class MainActivity : Activity() {
         val v: View = when (i) {
             0 -> buildHome()
             1 -> MemoView.build(this)
-            2 -> HomeView.placeholder(this, "음악")
+            2 -> MusicView.build(this)
             else -> buildMy()
         }
         pages.addView(v, FrameLayout.LayoutParams(-1, -1))
