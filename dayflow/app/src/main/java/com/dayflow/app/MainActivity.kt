@@ -25,10 +25,12 @@ class MainActivity : Activity() {
 
     private var year = 0
     private var month = 0
-
     private lateinit var monthTitle: TextView
     private lateinit var gridBox: LinearLayout
+    private lateinit var pages: FrameLayout
+    private lateinit var tabs: ArrayList<TextView>
     private var ready = false
+    private var cur = 1
 
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
@@ -67,10 +69,33 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-              if (ready) {
+        if (ready) {
             drawMonth()
+            show(cur)
             Weather.refresh(this) { runOnUiThread { drawMonth() } }
-              }  
+        }
+    }
+
+    private fun show(i: Int) {
+        cur = i
+        // 0 홈, 1 달력, 2 메모, 3 음악, 4 MY (달력 이외는 매번 새로 그림)
+        while (pages.childCount > 1) pages.removeViewAt(1)
+        val v: View = when (i) {
+            0 -> HomeView.build(this)
+            2 -> MemoView.build(this)
+            3 -> HomeView.placeholder(this, "음악")
+            4 -> HomeView.placeholder(this, "MY")
+            else -> View(this)
+        }
+        if (i == 1) {
+            pages.getChildAt(0).visibility = View.VISIBLE
+        } else {
+            pages.getChildAt(0).visibility = View.GONE
+            pages.addView(v, FrameLayout.LayoutParams(-1, -1))
+        }
+        for (j in 0..4) {
+            tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -209,39 +234,22 @@ class MainActivity : Activity() {
             frame.setBackgroundColor(Color.parseColor(Theme.bg(this)))
         }
         frame.addView(scroll, FrameLayout.LayoutParams(-1, -1))
-                val pages = FrameLayout(this)
-        val homeV = HomeView.build(this)
-                val memoV = MemoView.build(this)
-        val musicV = HomeView.placeholder(this, "음악")
-        val myV = HomeView.placeholder(this, "MY")
-        pages.addView(homeV, FrameLayout.LayoutParams(-1, -1))
+
+        pages = FrameLayout(this)
         pages.addView(frame, FrameLayout.LayoutParams(-1, -1))
-        pages.addView(memoV, FrameLayout.LayoutParams(-1, -1))
-        pages.addView(musicV, FrameLayout.LayoutParams(-1, -1))
-        pages.addView(myV, FrameLayout.LayoutParams(-1, -1))
-        val all = arrayOf<View>(homeV, frame, memoV, musicV, myV)
 
         val bar = LinearLayout(this)
         bar.orientation = LinearLayout.HORIZONTAL
         bar.setBackgroundColor(Color.parseColor("#FFFFFF"))
         val tabNames = arrayOf("홈", "달력", "메모", "음악", "MY")
-        val tabs = ArrayList<TextView>()
+        tabs = ArrayList()
         for (i in 0..4) {
             val t = label(tabNames[i], 14f, true)
             t.gravity = Gravity.CENTER
             t.setPadding(0, dp(14), 0, dp(14))
             bar.addView(t, wrap())
             tabs.add(t)
-            t.setOnClickListener {
-                for (j in 0..4) {
-                    all[j].visibility = if (j == i) View.VISIBLE else View.GONE
-                    tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
-                }
-            }
-        }
-        for (j in 0..4) {
-            all[j].visibility = if (j == 1) View.VISIBLE else View.GONE
-            tabs[j].setTextColor(Color.parseColor(if (j == 1) "#1976D2" else "#888888"))
+            t.setOnClickListener { show(i) }
         }
 
         val outer = LinearLayout(this)
@@ -252,7 +260,8 @@ class MainActivity : Activity() {
 
         ready = true
         drawMonth()
-                Weather.refresh(this) { runOnUiThread { drawMonth() } }
+        show(1)
+        Weather.refresh(this) { runOnUiThread { drawMonth() } }
     }
 
     private fun drawMonth() {
@@ -292,9 +301,8 @@ class MainActivity : Activity() {
                     cell.addView(cellText(CalData.lunarLabel(year, month, d), 10f, "#888888", false))
                     cell.addView(cellText(Fortune.score(year, month, d, 0).toString(), 11f, "#B8860B", true))
                     cell.addView(cellText(if (hasEvent) "●" else " ", 10f, "#E53935", false))
-                                        cell.addView(cellText(Weather.label(this, year, month, d), 10f, "#1976D2", false))
-                    
                     cell.addView(cellText(Weather.label(this, year, month, d), 10f, "#1976D2", false))
+
                     if (hasMemo) {
                         cell.setBackgroundColor(Color.parseColor(Theme.card(this)))
                     }
