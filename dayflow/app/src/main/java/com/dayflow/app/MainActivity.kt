@@ -4,19 +4,17 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Calendar
@@ -30,7 +28,7 @@ class MainActivity : Activity() {
     private lateinit var pages: FrameLayout
     private lateinit var tabs: ArrayList<TextView>
     private var ready = false
-    private var cur = 1
+    private var cur = 0
 
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
@@ -55,6 +53,13 @@ class MainActivity : Activity() {
         return LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
     }
 
+    private fun round(color: String, r: Int): GradientDrawable {
+        val g = GradientDrawable()
+        g.setColor(Color.parseColor(color))
+        g.cornerRadius = dp(r).toFloat()
+        return g
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 77 && resultCode == RESULT_OK && data != null) {
@@ -70,30 +75,185 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (ready) {
-            drawMonth()
             show(cur)
-            Weather.refresh(this) { runOnUiThread { drawMonth() } }
+            Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
         }
+    }
+
+    private fun banner(): View {
+        val box = FrameLayout(this)
+        val bgd = BgImage.drawable(this)
+        if (bgd != null) {
+            val iv = ImageView(this)
+            iv.scaleType = ImageView.ScaleType.CENTER_CROP
+            iv.setImageDrawable(bgd)
+            box.addView(iv, FrameLayout.LayoutParams(-1, -1))
+        } else {
+            val g = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#7EC8F5"), Color.parseColor("#CDE9FA"))
+            )
+            box.background = g
+        }
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(dp(20), dp(40), dp(20), 0)
+        val t1 = label("DAYFLOW", 28f, true)
+        t1.setTextColor(Color.WHITE)
+        t1.setShadowLayer(6f, 0f, 2f, Color.parseColor("#66000000"))
+        val t2 = label("오늘도, 더 나은 하루를 위해", 14f, false)
+        t2.setTextColor(Color.WHITE)
+        t2.setShadowLayer(6f, 0f, 2f, Color.parseColor("#66000000"))
+        col.addView(t1)
+        col.addView(t2)
+        box.addView(col, FrameLayout.LayoutParams(-1, -2))
+        return box
+    }
+
+    private fun summaryCard(): View {
+        val now = Calendar.getInstance()
+        val y = now.get(Calendar.YEAR)
+        val m = now.get(Calendar.MONTH) + 1
+        val d = now.get(Calendar.DAY_OF_MONTH)
+        val card = LinearLayout(this)
+        card.orientation = LinearLayout.HORIZONTAL
+        card.gravity = Gravity.CENTER_VERTICAL
+        card.background = round("#FFFFFF", 18)
+        card.elevation = dp(4).toFloat()
+        card.setPadding(dp(16), dp(14), dp(16), dp(14))
+
+        val w = label("☀ 오늘 날씨\n" + Weather.detail(this, y, m, d), 14f, false)
+        w.setTextColor(Color.parseColor("#333333"))
+        card.addView(w, wrap())
+
+        val f = LinearLayout(this)
+        f.orientation = LinearLayout.VERTICAL
+        f.gravity = Gravity.END
+        val a = label("오늘의 운세", 13f, false)
+        a.setTextColor(Color.parseColor("#666666"))
+        val b = label(Fortune.score(y, m, d, 0).toString() + "점", 24f, true)
+        b.setTextColor(Color.parseColor("#6A3DE8"))
+        f.addView(a)
+        f.addView(b)
+        card.addView(f, LinearLayout.LayoutParams(-2, -2))
+        return card
+    }
+
+    private fun buildHome(): View {
+        val sv = ScrollView(this)
+        sv.setBackgroundColor(Color.parseColor("#F4F7FB"))
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        sv.addView(root)
+
+        root.addView(banner(), LinearLayout.LayoutParams(-1, dp(190)))
+
+        val cal = LinearLayout(this)
+        cal.orientation = LinearLayout.VERTICAL
+        cal.background = round("#FFFFFF", 22)
+        cal.elevation = dp(4).toFloat()
+        cal.setPadding(dp(8), dp(10), dp(8), dp(10))
+
+        val head = LinearLayout(this)
+        head.orientation = LinearLayout.HORIZONTAL
+        head.gravity = Gravity.CENTER_VERTICAL
+        val prev = label("‹", 28f, true)
+        prev.gravity = Gravity.CENTER
+        prev.setPadding(dp(16), 0, dp(16), 0)
+        head.addView(prev)
+        monthTitle = label("", 20f, true)
+        monthTitle.gravity = Gravity.CENTER
+        monthTitle.setTextColor(Color.parseColor("#222222"))
+        head.addView(monthTitle, wrap())
+        val next = label("›", 28f, true)
+        next.gravity = Gravity.CENTER
+        next.setPadding(dp(16), 0, dp(16), 0)
+        head.addView(next)
+        cal.addView(head)
+
+        val week = LinearLayout(this)
+        week.orientation = LinearLayout.HORIZONTAL
+        val names = arrayOf("일", "월", "화", "수", "목", "금", "토")
+        for (i in 0..6) {
+            var color = "#444444"
+            if (i == 0) color = "#E53935"
+            if (i == 6) color = "#1976D2"
+            val w = cellText(names[i], 13f, color, true)
+            w.setPadding(0, dp(10), 0, dp(10))
+            week.addView(w, wrap())
+        }
+        cal.addView(week)
+
+        gridBox = LinearLayout(this)
+        gridBox.orientation = LinearLayout.VERTICAL
+        cal.addView(gridBox)
+
+        prev.setOnClickListener {
+            month -= 1
+            if (month < 1) {
+                month = 12
+                year -= 1
+            }
+            drawMonth()
+        }
+        next.setOnClickListener {
+            month += 1
+            if (month > 12) {
+                month = 1
+                year += 1
+            }
+            drawMonth()
+        }
+
+        val lp = LinearLayout.LayoutParams(-1, -2)
+        lp.setMargins(dp(12), dp(-24), dp(12), dp(12))
+        root.addView(cal, lp)
+
+        val lp2 = LinearLayout.LayoutParams(-1, -2)
+        lp2.setMargins(dp(12), 0, dp(12), dp(20))
+        root.addView(summaryCard(), lp2)
+
+        drawMonth()
+        return sv
+    }
+
+    private fun buildMy(): View {
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.parseColor("#F4F7FB"))
+        root.setPadding(dp(20), dp(48), dp(20), dp(20))
+        root.addView(label("MY", 26f, true))
+        val pick = Button(this)
+        pick.text = "배너 사진 선택"
+        pick.setOnClickListener {
+            val i = Intent(Intent.ACTION_GET_CONTENT)
+            i.type = "image/*"
+            startActivityForResult(i, 77)
+        }
+        Ui.style(this, pick, 0)
+        root.addView(pick)
+        val clear = Button(this)
+        clear.text = "배너 사진 지우기"
+        clear.setOnClickListener {
+            BgImage.clear(this)
+            show(0)
+        }
+        Ui.style(this, clear, 4)
+        root.addView(clear)
+        return root
     }
 
     private fun show(i: Int) {
         cur = i
-        // 0 홈, 1 달력, 2 메모, 3 음악, 4 MY (달력 이외는 매번 새로 그림)
-        while (pages.childCount > 1) pages.removeViewAt(1)
+        pages.removeAllViews()
         val v: View = when (i) {
-            0 -> HomeView.build(this)
-            2 -> MemoView.build(this)
-            3 -> HomeView.placeholder(this, "음악")
-            4 -> HomeView.placeholder(this, "MY")
-            else -> View(this)
+            0 -> buildHome()
+            1 -> MemoView.build(this)
+            2 -> HomeView.placeholder(this, "음악")
+            else -> buildMy()
         }
-        if (i == 1) {
-            pages.getChildAt(0).visibility = View.VISIBLE
-        } else {
-            pages.getChildAt(0).visibility = View.GONE
-            pages.addView(v, FrameLayout.LayoutParams(-1, -1))
-        }
-        for (j in 0..4) {
+        pages.addView(v, FrameLayout.LayoutParams(-1, -1))
+        for (j in 0..3) {
             tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
         }
     }
@@ -126,127 +286,18 @@ class MainActivity : Activity() {
         year = now.get(Calendar.YEAR)
         month = now.get(Calendar.MONTH) + 1
 
-        val scroll = ScrollView(this)
-        val root = LinearLayout(this)
-        root.orientation = LinearLayout.VERTICAL
-        root.setPadding(dp(12), dp(32), dp(12), dp(24))
-        scroll.addView(root)
-
-        val themeSpin = Spinner(this)
-        themeSpin.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_dropdown_item, Theme.names
-        )
-        themeSpin.setSelection(Theme.get(this))
-        themeSpin.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                if (pos != Theme.get(this@MainActivity)) {
-                    Theme.set(this@MainActivity, pos)
-                    recreate()
-                }
-            }
-            override fun onNothingSelected(p: AdapterView<*>?) {}
-        }
-        root.addView(themeSpin)
-
-        val bgRow = LinearLayout(this)
-        bgRow.orientation = LinearLayout.HORIZONTAL
-        val bgPick = Button(this)
-        bgPick.text = "배경 사진 선택"
-        bgPick.setOnClickListener {
-            val i = Intent(Intent.ACTION_GET_CONTENT)
-            i.type = "image/*"
-            startActivityForResult(i, 77)
-        }
-        bgRow.addView(bgPick, wrap())
-        val bgClear = Button(this)
-        bgClear.text = "배경 지우기"
-        bgClear.setOnClickListener {
-            BgImage.clear(this)
-            recreate()
-        }
-        bgRow.addView(bgClear, wrap())
-        root.addView(bgRow)
-
-        val head = LinearLayout(this)
-        head.orientation = LinearLayout.HORIZONTAL
-        head.gravity = Gravity.CENTER_VERTICAL
-        val prev = Button(this)
-        prev.text = "<"
-        head.addView(prev)
-        monthTitle = label("", 22f, true)
-        monthTitle.gravity = Gravity.CENTER
-        head.addView(monthTitle, wrap())
-        val next = Button(this)
-        next.text = ">"
-        head.addView(next)
-        root.addView(head)
-
-        val week = LinearLayout(this)
-        week.orientation = LinearLayout.HORIZONTAL
-        val names = arrayOf("일", "월", "화", "수", "목", "금", "토")
-        for (i in 0..6) {
-            var color = "#222222"
-            if (i == 0) color = "#D32F2F"
-            if (i == 6) color = "#1976D2"
-            val w = cellText(names[i], 14f, color, false)
-            w.setPadding(0, dp(8), 0, dp(8))
-            week.addView(w, wrap())
-        }
-        root.addView(week)
-
-        gridBox = LinearLayout(this)
-        gridBox.orientation = LinearLayout.VERTICAL
-        root.addView(gridBox)
-
-        root.addView(label("날짜를 누르면 운세, 일정, 메모를 볼 수 있어요", 13f, false))
-
-        prev.setOnClickListener {
-            month -= 1
-            if (month < 1) {
-                month = 12
-                year -= 1
-            }
-            drawMonth()
-        }
-        next.setOnClickListener {
-            month += 1
-            if (month > 12) {
-                month = 1
-                year += 1
-            }
-            drawMonth()
-        }
-
-        Ui.style(this, prev, 0)
-        Ui.style(this, next, 0)
-        Ui.style(this, bgPick, 1)
-        Ui.style(this, bgClear, 4)
-
-        val frame = FrameLayout(this)
-        val bgd = BgImage.drawable(this)
-        if (bgd != null) {
-            val bgView = ImageView(this)
-            bgView.scaleType = ImageView.ScaleType.CENTER_CROP
-            bgd.alpha = 140
-            bgView.setImageDrawable(bgd)
-            frame.addView(bgView, FrameLayout.LayoutParams(-1, -1))
-        } else {
-            frame.setBackgroundColor(Color.parseColor(Theme.bg(this)))
-        }
-        frame.addView(scroll, FrameLayout.LayoutParams(-1, -1))
-
         pages = FrameLayout(this)
-        pages.addView(frame, FrameLayout.LayoutParams(-1, -1))
 
         val bar = LinearLayout(this)
         bar.orientation = LinearLayout.HORIZONTAL
-        bar.setBackgroundColor(Color.parseColor("#FFFFFF"))
-        val tabNames = arrayOf("홈", "달력", "메모", "음악", "MY")
+        bar.setBackgroundColor(Color.WHITE)
+        bar.elevation = dp(8).toFloat()
+        val tabNames = arrayOf("🏠\n홈", "📝\n메모", "🎵\n음악", "👤\nMY")
         tabs = ArrayList()
-        for (i in 0..4) {
-            val t = label(tabNames[i], 14f, true)
+        for (i in 0..3) {
+            val t = label(tabNames[i], 12f, true)
             t.gravity = Gravity.CENTER
-            t.setPadding(0, dp(14), 0, dp(14))
+            t.setPadding(0, dp(8), 0, dp(8))
             bar.addView(t, wrap())
             tabs.add(t)
             t.setOnClickListener { show(i) }
@@ -259,9 +310,8 @@ class MainActivity : Activity() {
         setContentView(outer)
 
         ready = true
-        drawMonth()
-        show(1)
-        Weather.refresh(this) { runOnUiThread { drawMonth() } }
+        show(0)
+        Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
     }
 
     private fun drawMonth() {
@@ -290,25 +340,22 @@ class MainActivity : Activity() {
                 if (day in 1..daysInMonth) {
                     val d = day
                     val holiday = CalData.holidayOf(year, month, d)
+                    val isToday = year == ty && month == tm && d == td
                     var color = "#222222"
-                    if (col == 0 || holiday != null) color = "#D32F2F"
+                    if (col == 0 || holiday != null) color = "#E53935"
                     else if (col == 6) color = "#1976D2"
+                    if (isToday) color = "#FFFFFF"
 
                     val hasEvent = Scheduler.loadEvents(this, year, month, d).isNotEmpty()
-                    val hasMemo = Scheduler.getMemo(this, year, month, d).isNotEmpty()
+                    val dot = if (hasEvent) "●" else " "
+                    val wcolor = if (isToday) "#FFFFFF" else "#1976D2"
+                    val scolor = if (isToday) "#FFFFFF" else "#7A5AE0"
 
-                    cell.addView(cellText(d.toString(), 16f, color, true))
-                    cell.addView(cellText(CalData.lunarLabel(year, month, d), 10f, "#888888", false))
-                    cell.addView(cellText(Fortune.score(year, month, d, 0).toString(), 11f, "#B8860B", true))
-                    cell.addView(cellText(if (hasEvent) "●" else " ", 10f, "#E53935", false))
-                    cell.addView(cellText(Weather.label(this, year, month, d), 10f, "#1976D2", false))
+                    cell.addView(cellText(d.toString() + " " + dot, 15f, color, true))
+                    cell.addView(cellText(Weather.label(this, year, month, d), 10f, wcolor, false))
+                    cell.addView(cellText(Fortune.score(year, month, d, 0).toString() + "점", 10f, scolor, false))
 
-                    if (hasMemo) {
-                        cell.setBackgroundColor(Color.parseColor(Theme.card(this)))
-                    }
-                    if (year == ty && month == tm && d == td) {
-                        cell.setBackgroundColor(Color.parseColor("#E3F2FD"))
-                    }
+                    if (isToday) cell.background = round("#2F7BE8", 12)
                     cell.setOnClickListener {
                         val i = Intent(this, DayActivity::class.java)
                         i.putExtra("y", year)
