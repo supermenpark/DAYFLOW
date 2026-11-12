@@ -1,6 +1,5 @@
 package com.dayflow.app
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -14,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -47,7 +47,6 @@ object MusicView {
     private fun prefs(c: Context) =
         c.getSharedPreferences("dayflow_music", Context.MODE_PRIVATE)
 
-    // 곡 저장 형식: 제목|링크|플레이리스트이름
     private fun load(c: Context): MutableList<String> {
         val raw = prefs(c).getString("list", "") ?: ""
         val l = ArrayList<String>()
@@ -80,7 +79,7 @@ object MusicView {
 
     private fun open(c: Context, title: String, link: String) {
         if (link.startsWith("content://")) {
-            if (!LocalMusic.play(c, link)) {
+            if (!LocalMusic.play(c, link.replace("%7C", "|"))) {
                 Toast.makeText(c, "재생할 앱이 없어요", Toast.LENGTH_SHORT).show()
             }
             return
@@ -220,34 +219,19 @@ object MusicView {
         val all = load(c)
         val names = lists(c)
 
-        val pickBtn = pill(c, "📂  내 폰 음악 불러오기 (여러 곡 선택)", "#7BD3A0", "#2FA866")
+        val pickBtn = pill(c, "📂  폰 음악 파일 담기 (여러 곡 선택)", "#7BD3A0", "#2FA866")
         pickBtn.setOnClickListener {
-            val a = c as Activity
-            if (!LocalMusic.granted(a)) {
-                LocalMusic.ask(a)
-                Toast.makeText(c, "권한을 허용한 뒤 다시 눌러 주세요", Toast.LENGTH_SHORT).show()
-            } else {
-                LocalMusic.pick(a) { picked ->
-                    val l2 = load(c)
-                    val target = if (current == "전체") "" else current
-                    for (s in picked.reversed()) {
-                        val base = s.substringBefore("|") + "|" + s.substringAfter("|")
-                        l2.add(0, base + "|" + target)
-                    }
-                    save(c, l2)
-                    Toast.makeText(c, picked.size.toString() + "곡 저장됨", Toast.LENGTH_SHORT).show()
-                    refresh(c, sv)
-                }
-            }
+            val i = Intent(c, PickActivity::class.java)
+            i.putExtra("group", if (current == "전체") "" else current)
+            c.startActivity(i)
         }
         val plp2 = LinearLayout.LayoutParams(-1, -2)
         plp2.setMargins(0, 0, 0, dp(c, 12))
         root.addView(pickBtn, plp2)
 
-        // 플레이리스트 선택 줄
         val chipRow = LinearLayout(c)
         chipRow.orientation = LinearLayout.HORIZONTAL
-        val hs = android.widget.HorizontalScrollView(c)
+        val hs = HorizontalScrollView(c)
         hs.isHorizontalScrollBarEnabled = false
         hs.addView(chipRow)
         val tabs = ArrayList<String>()
@@ -359,7 +343,7 @@ object MusicView {
             }
         }
         if (shown == 0) {
-            val none = tv(c, "이 리스트에 곡이 없어요.\n폰 음악을 불러오거나 직접 추가해 보세요.", 14f, false, "#8895A7")
+            val none = tv(c, "이 리스트에 곡이 없어요.\n폰 음악 파일을 담거나 직접 추가해 보세요.", 14f, false, "#8895A7")
             none.gravity = Gravity.CENTER
             none.setPadding(0, dp(c, 24), 0, 0)
             root.addView(none)
