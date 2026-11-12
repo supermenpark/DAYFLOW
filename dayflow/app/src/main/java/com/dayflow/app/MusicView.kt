@@ -11,7 +11,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.media.MediaStore
+import android.provider.MediaStore
 import android.net.Uri
 import android.os.Build
 import android.text.InputType
@@ -182,7 +182,7 @@ object MusicView {
             Toast.makeText(
                 c,
                 if (added > 0) {
-                    "$added곡을 DAYFLOW에 추가했어요."
+                    "${added}곡을 DAYFLOW에 추가했어요."
                 } else {
                     "새로 가져올 음악이 없어요."
                 },
