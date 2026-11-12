@@ -1,20 +1,25 @@
 
 package com.dayflow.app
 
+import android.Manifest
+import android.app.Activity
 import android.app.AlertDialog
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.MediaStore
 import android.net.Uri
+import android.os.Build
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -22,658 +27,492 @@ import android.widget.Toast
 
 object MusicView {
 
-    private val accents = arrayOf(
-        "#8A55D8", "#2F7BE8", "#E0526F", "#2FA866", "#E8772E"
-    )
-
     private var current = "전체"
-
-    private data class Song(
-        val title: String,
-        val link: String,
-        val group: String,
-        val originalIndex: Int
-    )
-
-    private var queue = emptyList<Song>()
+    private var queue = mutableListOf<Pair<String, String>>()
     private var queueIndex = -1
-    private var nowPlayingTitle = ""
+    private var nowPlaying = ""
 
-    private fun dp(c: Context, v: Int): Int {
-        return (v * c.resources.displayMetrics.density).toInt()
-    }
+    private fun dp(c: Context, v: Int) =
+        (v * c.resources.displayMetrics.density).toInt()
 
     private fun tv(
-        c: Context,
-        s: String,
-        size: Float,
-        bold: Boolean,
-        color: String
+        c: Context, s: String, size: Float,
+        bold: Boolean, color: String
     ): TextView {
-        val t = TextView(c)
-        t.text = s
-        t.textSize = size
-        t.setTextColor(Color.parseColor(color))
-        if (bold) t.setTypeface(null, Typeface.BOLD)
-        return t
+        return TextView(c).apply {
+            text = s
+            textSize = size
+            setTextColor(Color.parseColor(color))
+            if (bold) setTypeface(null, Typeface.BOLD)
+        }
     }
 
-    private fun shape(
-        c: Context,
-        color: String,
-        r: Int
-    ): GradientDrawable {
-        val g = GradientDrawable()
-        g.setColor(Color.parseColor(color))
-        g.cornerRadius = dp(c, r).toFloat()
-        return g
+    private fun shape(c: Context, color: String, r: Int) =
+        GradientDrawable().apply {
+            setColor(Color.parseColor(color))
+            cornerRadius = dp(c, r).toFloat()
+        }
+
+    private fun button(
+        c: Context, text: String, color: String
+    ): TextView {
+        return tv(c, text, 14f, true, "#FFFFFF").apply {
+            gravity = Gravity.CENTER
+            background = shape(c, color, 18)
+            setPadding(dp(c, 12), dp(c, 13), dp(c, 12), dp(c, 13))
+        }
     }
 
     private fun prefs(c: Context) =
         c.getSharedPreferences("dayflow_music", Context.MODE_PRIVATE)
 
-    private fun load(c: Context): MutableList<String> {
-        val raw = prefs(c).getString("list", "") ?: ""
-        return raw.split("\n").filter { it.isNotEmpty() }.toMutableList()
+    private fun load(c: Context): MutableList<String> =
+        (prefs(c).getString("list", "") ?: "")
+            .split("\n").filter { it.isNotEmpty() }.toMutableList()
+
+    private fun save(c: Context, list: List<String>) {
+        prefs(c).edit().putString("list", list.joinToString("\n")).apply()
     }
 
-    private fun save(c: Context, l: List<String>) {
-        prefs(c).edit().putString("list", l.joinToString("\n")).apply()
+    private fun lists(c: Context): MutableList<String> =
+        (prefs(c).getString("names", "") ?: "")
+            .split("\n").filter { it.isNotEmpty() }.toMutableList()
+
+    private fun saveLists(c: Context, names: List<String>) {
+        prefs(c).edit().putString("names", names.joinToString("\n")).apply()
     }
 
-    private fun lists(c: Context): MutableList<String> {
-        val raw = prefs(c).getString("names", "") ?: ""
-        return raw.split("\n").filter { it.isNotEmpty() }.toMutableList()
+    private fun clean(s: String) =
+        s.trim().replace("|", " ").replace("\n", " ")
+
+    private fun permission(): String {
+        return if (Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
     }
 
-    private fun saveLists(c: Context, l: List<String>) {
-        prefs(c).edit().putString("names", l.joinToString("\n")).apply()
-    }
-
-    private fun clean(s: String): String {
-        return s.trim().replace("|", " ").replace("\n", " ")
-    }
-
-    private fun parseSong(raw: String, index: Int): Song {
-        val p = raw.split("|", limit = 3)
-        return Song(
-            title = p.getOrElse(0) { "" },
-            link = p.getOrElse(1) { "" }.replace("%7C", "|"),
-            group = p.getOrElse(2) { "" },
-            originalIndex = index
-        )
-    }
-
-    private fun open(c: Context, title: String, link: String) {
-        if (link.startsWith("content://")) {
-            Toast.makeText(
-                c,
-                "음악 파일을 불러오는 중입니다.",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            if (!LocalMusic.play(c, link)) {
+    private fun importPhoneMusic(c: Context, sv: ScrollView) {
+        if (Build.VERSION.SDK_INT >= 23 &&
+            c.checkSelfPermission(permission()) != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (c is Activity) {
+                c.requestPermissions(arrayOf(permission()), 2026)
                 Toast.makeText(
                     c,
-                    "음악 파일을 재생할 수 없습니다.",
+                    "음악 접근을 허용한 뒤 불러오기 버튼을 다시 눌러 주세요.",
                     Toast.LENGTH_LONG
                 ).show()
-            } else {
-                nowPlayingTitle = title
             }
             return
         }
 
-        val u = if (link.isNotEmpty()) {
-            if (link.startsWith("http")) link else "https://$link"
-        } else {
-            "https://www.youtube.com/results?search_query=" +
-                Uri.encode(title)
-        }
+        val all = load(c)
+        val existing = all.mapNotNull {
+            val p = it.split("|", limit = 3)
+            p.getOrNull(1)
+        }.toHashSet()
+
+        var added = 0
 
         try {
-            val i = Intent(Intent.ACTION_VIEW, Uri.parse(u))
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            c.startActivity(i)
-        } catch (e: Exception) {
-            Toast.makeText(c, "열 수 있는 앱이 없어요", Toast.LENGTH_SHORT).show()
-        }
-    }
+            val collection =
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
 
-    private fun openMusicApp(c: Context) {
-        try {
-            val i = Intent.makeMainSelectorActivity(
-                Intent.ACTION_MAIN,
-                Intent.CATEGORY_APP_MUSIC
+            val projection = arrayOf(
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST
             )
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            c.startActivity(i)
+
+            val selection =
+                "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+
+            val sortOrder =
+                "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC"
+
+            c.contentResolver.query(
+                collection,
+                projection,
+                selection,
+                null,
+                sortOrder
+            )?.use { cursor ->
+
+                val idColumn =
+                    cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+
+                val titleColumn =
+                    cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+
+                val artistColumn =
+                    cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val title = cursor.getString(titleColumn) ?: "이름 없는 음악"
+                    val artist = cursor.getString(artistColumn) ?: ""
+
+                    val uri = ContentUris.withAppendedId(collection, id)
+                    val link = uri.toString()
+
+                    if (!existing.contains(link)) {
+                        val displayTitle =
+                            if (artist.isNotBlank() && artist != "<unknown>") {
+                                "$title - $artist"
+                            } else {
+                                title
+                            }
+
+                        all.add(
+                            0,
+                            clean(displayTitle) + "|" + link + "|" +
+                                (if (current == "전체") "" else current)
+                        )
+
+                        existing.add(link)
+                        added++
+                    }
+                }
+            }
+
+            save(c, all)
+
+            Toast.makeText(
+                c,
+                if (added > 0) {
+                    "$added곡을 DAYFLOW에 추가했어요."
+                } else {
+                    "새로 가져올 음악이 없어요."
+                },
+                Toast.LENGTH_LONG
+            ).show()
+
+            refresh(c, sv)
+
         } catch (e: Exception) {
             Toast.makeText(
                 c,
-                "기본 음악 앱을 찾지 못했어요",
-                Toast.LENGTH_SHORT
+                "음악 목록을 읽지 못했어요: ${e.message}",
+                Toast.LENGTH_LONG
             ).show()
         }
     }
 
     private fun refresh(c: Context, sv: ScrollView) {
-        val p = sv.parent
-        if (p is ViewGroup) {
-            val k = p.indexOfChild(sv)
-            p.removeViewAt(k)
-            p.addView(
+        val parent = sv.parent
+        if (parent is ViewGroup) {
+            val index = parent.indexOfChild(sv)
+            parent.removeViewAt(index)
+            parent.addView(
                 build(c),
-                k,
+                index,
                 FrameLayout.LayoutParams(-1, -1)
             )
         }
     }
 
-    private fun pill(
+    private fun play(
         c: Context,
-        text: String,
-        top: String,
-        bottom: String
-    ): TextView {
-        val b = tv(c, text, 15f, true, "#FFFFFF")
-        b.gravity = Gravity.CENTER
-
-        val g = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Color.parseColor(top), Color.parseColor(bottom))
-        )
-
-        g.cornerRadius = dp(c, 26).toFloat()
-        b.background = g
-        b.elevation = dp(c, 4).toFloat()
-        b.setPadding(0, dp(c, 14), 0, dp(c, 14))
-        return b
-    }
-
-    private fun input(c: Context, hint: String): EditText {
-        val e = EditText(c)
-        e.hint = hint
-        e.setSingleLine(true)
-        e.inputType = InputType.TYPE_CLASS_TEXT
-        e.background = shape(c, "#F1F5FB", 12)
-        e.setPadding(
-            dp(c, 14), dp(c, 12),
-            dp(c, 14), dp(c, 12)
-        )
-        return e
-    }
-
-    private fun playSong(
-        c: Context,
-        songs: List<Song>,
+        songs: List<Pair<String, String>>,
         index: Int,
         label: TextView
     ) {
         if (index !in songs.indices) return
 
         val song = songs[index]
+        val title = song.first
+        val link = song.second
 
-        if (!song.link.startsWith("content://")) {
-            open(c, song.title, song.link)
+        if (!link.startsWith("content://")) {
+            val url = if (link.startsWith("http")) link
+                else "https://www.youtube.com/results?search_query=" +
+                    Uri.encode(title)
+
+            try {
+                c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (_: Exception) {
+                Toast.makeText(c, "열 수 있는 앱이 없어요.", Toast.LENGTH_SHORT).show()
+            }
             return
         }
 
-        queue = songs
+        queue = songs.toMutableList()
         queueIndex = index
 
-        if (LocalMusic.play(c, song.link)) {
-            nowPlayingTitle = song.title
-            label.text = "🎵 재생 준비 중: $nowPlayingTitle"
+        if (LocalMusic.play(c, link)) {
+            nowPlaying = title
+            label.text = "🎵 재생 준비 중: $title"
         } else {
-            label.text = "음악을 재생할 수 없습니다."
-            Toast.makeText(
-                c,
-                "음악 파일을 열 수 없습니다.",
-                Toast.LENGTH_LONG
-            ).show()
+            label.text = "재생할 수 없습니다."
+            Toast.makeText(c, "음악 파일을 열 수 없어요.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun previousSong(c: Context, label: TextView) {
-        if (queue.isEmpty() || queueIndex < 0) {
-            Toast.makeText(c, "먼저 곡을 선택하세요.", Toast.LENGTH_SHORT).show()
-            return
+    private fun input(c: Context, hint: String): EditText =
+        EditText(c).apply {
+            this.hint = hint
+            setSingleLine(true)
+            inputType = InputType.TYPE_CLASS_TEXT
+            background = shape(c, "#F1F5FB", 12)
+            setPadding(dp(c, 12), dp(c, 8), dp(c, 12), dp(c, 8))
         }
-
-        val nextIndex = if (queueIndex == 0) {
-            queue.size - 1
-        } else {
-            queueIndex - 1
-        }
-
-        playSong(c, queue, nextIndex, label)
-    }
-
-    private fun nextSong(c: Context, label: TextView) {
-        if (queue.isEmpty() || queueIndex < 0) {
-            Toast.makeText(c, "먼저 곡을 선택하세요.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val nextIndex = (queueIndex + 1) % queue.size
-        playSong(c, queue, nextIndex, label)
-    }
-
-    private fun item(
-        c: Context,
-        sv: ScrollView,
-        song: Song,
-        accent: String,
-        onPlay: () -> Unit
-    ): View {
-        val outer = LinearLayout(c)
-        outer.orientation = LinearLayout.HORIZONTAL
-        outer.gravity = Gravity.CENTER_VERTICAL
-        outer.background = shape(c, "#FFFFFF", 16)
-        outer.elevation = dp(c, 3).toFloat()
-
-        val bar = View(c)
-        bar.background = shape(c, accent, 4)
-        outer.addView(
-            bar,
-            LinearLayout.LayoutParams(dp(c, 5), dp(c, 64))
-        )
-
-        val col = LinearLayout(c)
-        col.orientation = LinearLayout.VERTICAL
-        col.setPadding(
-            dp(c, 14), dp(c, 12),
-            dp(c, 8), dp(c, 12)
-        )
-
-        col.addView(tv(c, "🎵 " + song.title, 15f, true, "#222222"))
-
-        val sub = if (song.link.startsWith("content://")) {
-            "DAYFLOW 내부 재생"
-        } else if (song.link.isEmpty()) {
-            "유튜브에서 검색"
-        } else {
-            "저장된 링크"
-        }
-
-        col.addView(tv(c, sub, 12f, false, "#8895A7"))
-
-        outer.addView(
-            col,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        val play = tv(c, "▶", 16f, true, "#FFFFFF")
-        play.gravity = Gravity.CENTER
-        play.background = shape(c, accent, 20)
-
-        val plp = LinearLayout.LayoutParams(dp(c, 40), dp(c, 40))
-        plp.setMargins(0, 0, dp(c, 8), 0)
-        outer.addView(play, plp)
-
-        val del = tv(c, "✕", 15f, true, "#8895A7")
-        del.gravity = Gravity.CENTER
-        del.background = shape(c, "#EEF2F7", 20)
-
-        val dlp = LinearLayout.LayoutParams(dp(c, 34), dp(c, 34))
-        dlp.setMargins(0, 0, dp(c, 10), 0)
-        outer.addView(del, dlp)
-
-        outer.setOnClickListener { onPlay() }
-        play.setOnClickListener { onPlay() }
-
-        del.setOnClickListener {
-            val all = load(c)
-            if (song.originalIndex in all.indices) {
-                all.removeAt(song.originalIndex)
-                save(c, all)
-                refresh(c, sv)
-            }
-        }
-
-        return outer
-    }
 
     fun build(c: Context): ScrollView {
         val sv = ScrollView(c)
         sv.setBackgroundColor(Color.parseColor("#F6F9FD"))
 
-        val root = LinearLayout(c)
-        root.orientation = LinearLayout.VERTICAL
-        root.setPadding(
-            dp(c, 16), dp(c, 40),
-            dp(c, 16), dp(c, 24)
-        )
+        val root = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(c, 16), dp(c, 35), dp(c, 16), dp(c, 24))
+        }
         sv.addView(root)
 
-        root.addView(tv(c, "🎵 음악", 30f, true, "#0F2A55"))
+        root.addView(tv(c, "🎵 음악", 28f, true, "#0F2A55"))
 
-        val row = LinearLayout(c)
-        row.orientation = LinearLayout.HORIZONTAL
+        val importButton = button(
+            c, "📂 휴대폰 음악 전체 불러오기", "#2FA866"
+        )
+        val bp = LinearLayout.LayoutParams(-1, -2)
+        bp.setMargins(0, dp(c, 15), 0, dp(c, 10))
+        root.addView(importButton, bp)
 
-        val b1 = pill(c, "내 뮤직 열기", "#B58CF0", "#7C4DDB")
-        b1.setOnClickListener { openMusicApp(c) }
-
-        val l1 = LinearLayout.LayoutParams(0, -2, 1f)
-        l1.setMargins(0, 0, dp(c, 6), 0)
-        row.addView(b1, l1)
-
-        val b2 = pill(c, "유튜브 뮤직", "#FF8A9B", "#E0526F")
-        b2.setOnClickListener {
-            open(c, "", "https://music.youtube.com")
+        importButton.setOnClickListener {
+            importPhoneMusic(c, sv)
         }
 
-        val l2 = LinearLayout.LayoutParams(0, -2, 1f)
-        l2.setMargins(dp(c, 6), 0, 0, 0)
-        row.addView(b2, l2)
-
-        val rlp = LinearLayout.LayoutParams(-1, -2)
-        rlp.setMargins(0, dp(c, 16), 0, dp(c, 12))
-        root.addView(row, rlp)
-
-        val pickBtn = pill(
-            c,
-            "📂  폰 음악 파일 담기 (여러 곡 선택)",
-            "#7BD3A0",
-            "#2FA866"
-        )
-
-        pickBtn.setOnClickListener {
-            val i = Intent(c, PickActivity::class.java)
-            i.putExtra(
-                "group",
-                if (current == "전체") "" else current
-            )
-            c.startActivity(i)
+        val nowBox = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            background = shape(c, "#FFFFFF", 16)
+            setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12))
         }
 
-        val plp2 = LinearLayout.LayoutParams(-1, -2)
-        plp2.setMargins(0, 0, 0, dp(c, 12))
-        root.addView(pickBtn, plp2)
-
-        // 현재 재생 중인 곡
-        val nowBox = LinearLayout(c)
-        nowBox.orientation = LinearLayout.VERTICAL
-        nowBox.background = shape(c, "#FFFFFF", 18)
-        nowBox.elevation = dp(c, 3).toFloat()
-        nowBox.setPadding(
-            dp(c, 14), dp(c, 14),
-            dp(c, 14), dp(c, 14)
-        )
-
-        nowBox.addView(
-            tv(c, "DAYFLOW 플레이어", 16f, true, "#0F2A55")
-        )
+        nowBox.addView(tv(c, "DAYFLOW 플레이어", 16f, true, "#0F2A55"))
 
         val nowLabel = tv(
             c,
-            if (nowPlayingTitle.isEmpty()) {
-                "선택한 음악이 여기에 표시됩니다."
-            } else {
-                "🎵 $nowPlayingTitle"
-            },
-            14f,
-            true,
-            "#333333"
+            if (nowPlaying.isEmpty()) "재생할 곡을 선택하세요."
+            else "🎵 $nowPlaying",
+            14f, true, "#333333"
         )
-
         nowLabel.setPadding(0, dp(c, 10), 0, dp(c, 10))
         nowBox.addView(nowLabel)
 
-        val controlRow = LinearLayout(c)
-        controlRow.orientation = LinearLayout.HORIZONTAL
-        controlRow.gravity = Gravity.CENTER
+        val controls = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
 
-        val prev = pill(c, "⏮ 이전", "#8A55D8", "#6840B5")
-        val pause = pill(c, "▶ 재생 / 일시정지", "#5CB8FF", "#2F86EA")
-        val next = pill(c, "다음 ⏭", "#8A55D8", "#6840B5")
+        val prev = button(c, "⏮ 이전", "#8A55D8")
+        val toggle = button(c, "▶ / ⏸", "#2F86EA")
+        val next = button(c, "다음 ⏭", "#8A55D8")
 
-        val cp1 = LinearLayout.LayoutParams(0, -2, 1f)
-        cp1.setMargins(0, 0, dp(c, 4), 0)
-        controlRow.addView(prev, cp1)
-
-        val cp2 = LinearLayout.LayoutParams(0, -2, 1.5f)
-        cp2.setMargins(dp(c, 4), 0, dp(c, 4), 0)
-        controlRow.addView(pause, cp2)
-
-        val cp3 = LinearLayout.LayoutParams(0, -2, 1f)
-        cp3.setMargins(dp(c, 4), 0, 0, 0)
-        controlRow.addView(next, cp3)
-
-        nowBox.addView(controlRow)
+        controls.addView(prev, LinearLayout.LayoutParams(0, -2, 1f))
+        controls.addView(toggle, LinearLayout.LayoutParams(0, -2, 1.2f))
+        controls.addView(next, LinearLayout.LayoutParams(0, -2, 1f))
+        nowBox.addView(controls)
 
         prev.setOnClickListener {
-            previousSong(c, nowLabel)
+            if (queue.isNotEmpty() && queueIndex >= 0) {
+                val i = if (queueIndex == 0) queue.size - 1 else queueIndex - 1
+                play(c, queue, i, nowLabel)
+            }
         }
 
         next.setOnClickListener {
-            nextSong(c, nowLabel)
-        }
-
-        pause.setOnClickListener {
-            if (LocalMusic.toggle()) {
-                val status = if (LocalMusic.isPlaying()) {
-                    "재생 중"
-                } else {
-                    "일시정지"
-                }
-                nowLabel.text = "🎵 $nowPlayingTitle ($status)"
-            } else {
-                Toast.makeText(
-                    c,
-                    "먼저 음악을 선택하거나 재생 준비가 끝날 때까지 기다려 주세요.",
-                    Toast.LENGTH_SHORT
-                ).show()
+            if (queue.isNotEmpty() && queueIndex >= 0) {
+                play(c, queue, (queueIndex + 1) % queue.size, nowLabel)
             }
         }
 
-        val nlp = LinearLayout.LayoutParams(-1, -2)
-        nlp.setMargins(0, 0, 0, dp(c, 16))
-        root.addView(nowBox, nlp)
+        toggle.setOnClickListener {
+            if (LocalMusic.toggle()) {
+                nowLabel.text = "🎵 $nowPlaying" +
+                    if (LocalMusic.isPlaying()) " (재생 중)" else " (일시정지)"
+            } else {
+                Toast.makeText(c, "먼저 곡을 선택하세요.", Toast.LENGTH_SHORT).show()
+            }
+        }
 
-        val all = load(c)
+        val nowParams = LinearLayout.LayoutParams(-1, -2)
+        nowParams.setMargins(0, 0, 0, dp(c, 15))
+        root.addView(nowBox, nowParams)
+
         val names = lists(c)
+        val all = load(c)
 
-        val chipRow = LinearLayout(c)
-        chipRow.orientation = LinearLayout.HORIZONTAL
+        val tabs = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
 
-        val hs = HorizontalScrollView(c)
-        hs.isHorizontalScrollBarEnabled = false
-        hs.addView(chipRow)
+        val allTab = ArrayList<String>()
+        allTab.add("전체")
+        allTab.addAll(names)
 
-        val tabs = ArrayList<String>()
-        tabs.add("전체")
-        tabs.addAll(names)
-
-        for (n in tabs) {
-            val sel = n == current
-            val chip = tv(
-                c,
-                n,
-                13f,
-                true,
-                if (sel) "#FFFFFF" else "#2F7BE8"
+        for (name in allTab) {
+            val chip = button(
+                c, name,
+                if (current == name) "#2F7BE8" else "#8DA9D0"
             )
-
-            chip.background = shape(
-                c,
-                if (sel) "#2F7BE8" else "#E4EEFC",
-                18
-            )
-
-            chip.setPadding(
-                dp(c, 14), dp(c, 8),
-                dp(c, 14), dp(c, 8)
-            )
-
+            val cp = LinearLayout.LayoutParams(-2, -2)
+            cp.setMargins(0, 0, dp(c, 6), dp(c, 8))
+            tabs.addView(chip, cp)
             chip.setOnClickListener {
-                current = n
+                current = name
                 refresh(c, sv)
             }
-
-            val clp = LinearLayout.LayoutParams(-2, -2)
-            clp.setMargins(0, 0, dp(c, 8), 0)
-            chipRow.addView(chip, clp)
         }
 
-        val newChip = tv(c, "＋ 새 리스트", 13f, true, "#8A55D8")
-        newChip.background = shape(c, "#EFE8FB", 18)
-        newChip.setPadding(
-            dp(c, 14), dp(c, 8),
-            dp(c, 14), dp(c, 8)
-        )
-
-        newChip.setOnClickListener {
-            val e = EditText(c)
-            e.hint = "리스트 이름 (예: 운동, 출근길)"
-
+        val newList = button(c, "＋ 리스트", "#8A55D8")
+        tabs.addView(newList)
+        newList.setOnClickListener {
+            val edit = input(c, "리스트 이름")
             AlertDialog.Builder(c)
                 .setTitle("새 플레이리스트")
-                .setView(e)
+                .setView(edit)
                 .setPositiveButton("만들기") { _, _ ->
-                    val nm = clean(e.text.toString())
-
-                    if (nm.isNotEmpty() &&
-                        nm != "전체" &&
-                        !names.contains(nm)
+                    val name = clean(edit.text.toString())
+                    val currentNames = lists(c)
+                    if (name.isNotEmpty() && name != "전체" &&
+                        !currentNames.contains(name)
                     ) {
-                        names.add(nm)
-                        saveLists(c, names)
-                        current = nm
+                        currentNames.add(name)
+                        saveLists(c, currentNames)
+                        current = name
                     }
-
                     refresh(c, sv)
                 }
                 .setNegativeButton("취소", null)
                 .show()
         }
 
-        chipRow.addView(newChip)
+        root.addView(tabs)
 
-        val hlp = LinearLayout.LayoutParams(-1, -2)
-        hlp.setMargins(0, 0, 0, dp(c, 12))
-        root.addView(hs, hlp)
+        val addForm = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            background = shape(c, "#FFFFFF", 16)
+            setPadding(dp(c, 12), dp(c, 12), dp(c, 12), dp(c, 12))
+        }
+
+        addForm.addView(tv(c, "직접 추가", 15f, true, "#222222"))
+        val titleInput = input(c, "곡 제목")
+        val linkInput = input(c, "링크 (선택)")
+
+        addForm.addView(titleInput)
+        addForm.addView(linkInput)
+
+        val addButton = button(c, "＋ 저장", "#2F86EA")
+        addForm.addView(addButton)
+
+        addButton.setOnClickListener {
+            val title = clean(titleInput.text.toString())
+            val link = clean(linkInput.text.toString())
+
+            if (title.isEmpty()) {
+                Toast.makeText(c, "곡 제목을 입력하세요.", Toast.LENGTH_SHORT).show()
+            } else {
+                val updated = load(c)
+                updated.add(
+                    0,
+                    title + "|" + link + "|" +
+                        (if (current == "전체") "" else current)
+                )
+                save(c, updated)
+                refresh(c, sv)
+            }
+        }
+
+        val formParams = LinearLayout.LayoutParams(-1, -2)
+        formParams.setMargins(0, dp(c, 10), 0, dp(c, 12))
+        root.addView(addForm, formParams)
 
         if (current != "전체") {
-            val delList = tv(
-                c,
-                "이 리스트 삭제 (곡은 전체로 이동)",
-                12f,
-                false,
-                "#E0526F"
+            val deleteList = tv(
+                c, "이 리스트 삭제", 12f, false, "#E0526F"
             )
+            root.addView(deleteList)
+            deleteList.setOnClickListener {
+                val updatedNames = lists(c)
+                updatedNames.remove(current)
+                saveLists(c, updatedNames)
 
-            delList.setPadding(0, 0, 0, dp(c, 8))
-
-            delList.setOnClickListener {
-                names.remove(current)
-                saveLists(c, names)
-
-                val moved = ArrayList<String>()
-
-                for (s in all) {
-                    val q = s.split("|", limit = 3)
-
-                    if (q.size > 2 && q[2] == current) {
-                        moved.add(q[0] + "|" + q[1] + "|")
-                    } else {
-                        moved.add(s)
-                    }
+                val updated = load(c).map { raw ->
+                    val p = raw.split("|", limit = 3)
+                    if (p.size > 2 && p[2] == current) {
+                        p[0] + "|" + p[1] + "|"
+                    } else raw
                 }
-
-                save(c, moved)
+                save(c, updated)
                 current = "전체"
                 refresh(c, sv)
             }
-
-            root.addView(delList)
         }
 
-        val form = LinearLayout(c)
-        form.orientation = LinearLayout.VERTICAL
-        form.background = shape(c, "#FFFFFF", 18)
-        form.elevation = dp(c, 3).toFloat()
-        form.setPadding(
-            dp(c, 14), dp(c, 14),
-            dp(c, 14), dp(c, 14)
-        )
-
-        form.addView(
-            tv(c, "직접 추가 ($current)", 15f, true, "#222222")
-        )
-
-        val tIn = input(c, "곡 제목 / 가수")
-        val lIn = input(c, "링크 (선택, 없으면 유튜브 검색)")
-
-        val ilp = LinearLayout.LayoutParams(-1, -2)
-        ilp.setMargins(0, dp(c, 8), 0, 0)
-        form.addView(tIn, ilp)
-        form.addView(lIn, ilp)
-
-        val add = pill(c, "＋  저장", "#5CB8FF", "#2F86EA")
-        val alp = LinearLayout.LayoutParams(-1, -2)
-        alp.setMargins(0, dp(c, 12), 0, 0)
-        form.addView(add, alp)
-
-        val flp = LinearLayout.LayoutParams(-1, -2)
-        flp.setMargins(0, 0, 0, dp(c, 14))
-        root.addView(form, flp)
-
-        add.setOnClickListener {
-            val t = clean(tIn.text.toString())
-            val l = clean(lIn.text.toString())
-
-            if (t.isEmpty()) {
-                Toast.makeText(
-                    c,
-                    "곡 제목을 입력하세요",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                val l2 = load(c)
-
-                l2.add(
-                    0,
-                    t + "|" + l + "|" +
-                        (if (current == "전체") "" else current)
-                )
-
-                save(c, l2)
-                refresh(c, sv)
-            }
-        }
-
-        val visibleSongs = all.mapIndexed { index, raw ->
-            parseSong(raw, index)
-        }.filter {
-            current == "전체" || it.group == current
-        }
-
-        if (visibleSongs.isEmpty()) {
-            val none = tv(
-                c,
-                "이 리스트에 곡이 없어요.\n폰 음악 파일을 담거나 직접 추가해 보세요.",
-                14f,
-                false,
-                "#8895A7"
+        val visible = all.map { raw ->
+            val p = raw.split("|", limit = 3)
+            Triple(
+                p.getOrElse(0) { "" },
+                p.getOrElse(1) { "" }.replace("%7C", "|"),
+                p.getOrElse(2) { "" }
             )
+        }.filter {
+            current == "전체" || it.third == current
+        }
 
-            none.gravity = Gravity.CENTER
-            none.setPadding(0, dp(c, 24), 0, 0)
-            root.addView(none)
-        } else {
-            for ((index, song) in visibleSongs.withIndex()) {
-                val lp = LinearLayout.LayoutParams(-1, -2)
-                lp.setMargins(0, dp(c, 6), 0, dp(c, 6))
+        if (visible.isEmpty()) {
+            val empty = tv(
+                c,
+                "아직 음악이 없어요.\n위의 휴대폰 음악 전체 불러오기를 눌러 주세요.",
+                14f, false, "#8895A7"
+            )
+            empty.gravity = Gravity.CENTER
+            empty.setPadding(0, dp(c, 24), 0, 0)
+            root.addView(empty)
+        }
 
-                root.addView(
-                    item(c, sv, song, accents[index % accents.size]) {
-                        playSong(c, visibleSongs, index, nowLabel)
-                    },
-                    lp
-                )
+        val songs = visible.map { it.first to it.second }
+
+        visible.forEachIndexed { index, song ->
+            val card = LinearLayout(c).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = shape(c, "#FFFFFF", 14)
+                setPadding(dp(c, 10), dp(c, 12), dp(c, 8), dp(c, 12))
             }
+
+            val title = tv(c, "🎵 ${song.first}", 14f, true, "#222222")
+            card.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
+
+            val playButton = button(c, "▶", "#2F86EA")
+            card.addView(playButton)
+
+            val deleteButton = button(c, "✕", "#8895A7")
+            card.addView(deleteButton)
+
+            val action = View.OnClickListener {
+                play(c, songs, index, nowLabel)
+            }
+            card.setOnClickListener(action)
+            playButton.setOnClickListener(action)
+
+            deleteButton.setOnClickListener {
+                val updated = load(c)
+                val originalIndex = all.indexOfFirst {
+                    val p = it.split("|", limit = 3)
+                    p.getOrElse(0) { "" } == song.first &&
+                        p.getOrElse(1) { "" }.replace("%7C", "|") == song.second
+                }
+                if (originalIndex >= 0) {
+                    updated.removeAt(originalIndex)
+                    save(c, updated)
+                    refresh(c, sv)
+                }
+            }
+
+            val itemParams = LinearLayout.LayoutParams(-1, -2)
+            itemParams.setMargins(0, dp(c, 5), 0, dp(c, 5))
+            root.addView(card, itemParams)
         }
 
         return sv
