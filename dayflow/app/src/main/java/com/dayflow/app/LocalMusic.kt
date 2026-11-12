@@ -66,12 +66,30 @@ object LocalMusic {
         AlertDialog.Builder(a)
             .setTitle("내 폰 음악 (" + items.size + "곡)")
                // 여러 곡을 체크해서 고르면 한꺼번에 콜백으로 전달
+            // 여러 곡을 체크해서 고르면 한꺼번에 콜백으로 전달
     fun pick(a: Activity, done: (List<String>) -> Unit) {
         val items = list(a)
         if (items.isEmpty()) {
             Toast.makeText(a, "폰에서 음악 파일을 찾지 못했어요", Toast.LENGTH_SHORT).show()
             return
         }
+        val names = Array(items.size) { items[it].substringBefore("|") }
+        val checked = BooleanArray(items.size)
+        AlertDialog.Builder(a)
+            .setTitle("담을 곡을 고르세요 (" + items.size + "곡)")
+            .setMultiChoiceItems(names, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton("저장") { _, _ ->
+                val picked = ArrayList<String>()
+                for (i in items.indices) {
+                    if (checked[i]) picked.add(items[i])
+                }
+                done(picked)
+            }
+            .setNegativeButton("닫기", null)
+            .show()
+    }
         val names = Array(items.size) { items[it].substringBefore("|") }
         val checked = BooleanArray(items.size)
         AlertDialog.Builder(a)
