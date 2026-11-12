@@ -1,5 +1,7 @@
 package com.dayflow.app
 
+import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -20,6 +22,7 @@ import android.widget.Toast
 object MusicView {
 
     private val accents = arrayOf("#8A55D8", "#2F7BE8", "#E0526F", "#2FA866", "#E8772E")
+    private var current = "전체"
 
     private fun dp(c: Context, v: Int): Int {
         return (v * c.resources.displayMetrics.density).toInt()
@@ -44,6 +47,7 @@ object MusicView {
     private fun prefs(c: Context) =
         c.getSharedPreferences("dayflow_music", Context.MODE_PRIVATE)
 
+    // 곡 저장 형식: 제목|링크|플레이리스트이름
     private fun load(c: Context): MutableList<String> {
         val raw = prefs(c).getString("list", "") ?: ""
         val l = ArrayList<String>()
@@ -57,11 +61,30 @@ object MusicView {
         prefs(c).edit().putString("list", l.joinToString("\n")).apply()
     }
 
+    private fun lists(c: Context): MutableList<String> {
+        val raw = prefs(c).getString("names", "") ?: ""
+        val l = ArrayList<String>()
+        for (n in raw.split("\n")) {
+            if (n.isNotEmpty()) l.add(n)
+        }
+        return l
+    }
+
+    private fun saveLists(c: Context, l: List<String>) {
+        prefs(c).edit().putString("names", l.joinToString("\n")).apply()
+    }
+
     private fun clean(s: String): String {
         return s.trim().replace("|", " ").replace("\n", " ")
     }
 
     private fun open(c: Context, title: String, link: String) {
+        if (link.startsWith("content://")) {
+            if (!LocalMusic.play(c, link)) {
+                Toast.makeText(c, "재생할 앱이 없어요", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         val u = if (link.isNotEmpty()) {
             if (link.startsWith("http")) link else "https://" + link
         } else {
@@ -119,11 +142,11 @@ object MusicView {
         return e
     }
 
-    private fun item(c: Context, sv: ScrollView, idx: Int, line: String, list: MutableList<String>): View {
-        val p = line.split("|")
+    private fun item(c: Context, sv: ScrollView, pos: Int, all: MutableList<String>): View {
+        val p = all[pos].split("|")
         val title = p[0]
         val link = if (p.size > 1) p[1] else ""
-        val accent = accents[idx % accents.size]
+        val accent = accents[pos % accents.size]
 
         val outer = LinearLayout(c)
         outer.orientation = LinearLayout.HORIZONTAL
@@ -138,8 +161,8 @@ object MusicView {
         val col = LinearLayout(c)
         col.orientation = LinearLayout.VERTICAL
         col.setPadding(dp(c, 14), dp(c, 12), dp(c, 8), dp(c, 12))
-        col.addView(tv(c, "🎵 " + title, 16f, true, "#222222"))
-        val sub = if (link.isEmpty()) "유튜브에서 검색해서 재생" else "저장된 링크로 열기"
+        col.addView(tv(c, "🎵 " + title, 15f, true, "#222222"))
+        val sub = if (link.startsWith("content://")) "내 폰 음악" else if (link.isEmpty()) "유튜브에서 검색" else "저장된 링크"
         col.addView(tv(c, sub, 12f, false, "#8895A7"))
         outer.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
 
@@ -161,8 +184,8 @@ object MusicView {
         outer.setOnClickListener(go)
         play.setOnClickListener(go)
         del.setOnClickListener {
-            list.removeAt(idx)
-            save(c, list)
+            all.removeAt(pos)
+            save(c, all)
             refresh(c, sv)
         }
         return outer
@@ -186,22 +209,117 @@ object MusicView {
         l1.setMargins(0, 0, dp(c, 6), 0)
         row.addView(b1, l1)
         val b2 = pill(c, "유튜브 뮤직", "#FF8A9B", "#E0526F")
-        b2.setOnClickListener {
-            open(c, "", "https://music.youtube.com")
-        }
+        b2.setOnClickListener { open(c, "", "https://music.youtube.com") }
         val l2 = LinearLayout.LayoutParams(0, -2, 1f)
         l2.setMargins(dp(c, 6), 0, 0, 0)
         row.addView(b2, l2)
         val rlp = LinearLayout.LayoutParams(-1, -2)
-        rlp.setMargins(0, dp(c, 16), 0, dp(c, 14))
+        rlp.setMargins(0, dp(c, 16), 0, dp(c, 12))
         root.addView(row, rlp)
+
+        val all = load(c)
+        val names = lists(c)
+
+        val pickBtn = pill(c, "📂  내 폰 음악 불러오기 (여러 곡 선택)", "#7BD3A0", "#2FA866")
+        pickBtn.setOnClickListener {
+            val a = c as Activity
+            if (!LocalMusic.granted(a)) {
+                LocalMusic.ask(a)
+                Toast.makeText(c, "권한을 허용한 뒤 다시 눌러 주세요", Toast.LENGTH_SHORT).show()
+            } else {
+                LocalMusic.pick(a) { picked ->
+                    val l2 = load(c)
+                    val target = if (current == "전체") "" else current
+                    for (s in picked.reversed()) {
+                        val base = s.substringBefore("|") + "|" + s.substringAfter("|")
+                        l2.add(0, base + "|" + target)
+                    }
+                    save(c, l2)
+                    Toast.makeText(c, picked.size.toString() + "곡 저장됨", Toast.LENGTH_SHORT).show()
+                    refresh(c, sv)
+                }
+            }
+        }
+        val plp2 = LinearLayout.LayoutParams(-1, -2)
+        plp2.setMargins(0, 0, 0, dp(c, 12))
+        root.addView(pickBtn, plp2)
+
+        // 플레이리스트 선택 줄
+        val chipRow = LinearLayout(c)
+        chipRow.orientation = LinearLayout.HORIZONTAL
+        val hs = android.widget.HorizontalScrollView(c)
+        hs.isHorizontalScrollBarEnabled = false
+        hs.addView(chipRow)
+        val tabs = ArrayList<String>()
+        tabs.add("전체")
+        tabs.addAll(names)
+        for (n in tabs) {
+            val sel = n == current
+            val chip = tv(c, n, 13f, true, if (sel) "#FFFFFF" else "#2F7BE8")
+            chip.background = shape(c, if (sel) "#2F7BE8" else "#E4EEFC", 18)
+            chip.setPadding(dp(c, 14), dp(c, 8), dp(c, 14), dp(c, 8))
+            chip.setOnClickListener {
+                current = n
+                refresh(c, sv)
+            }
+            val clp = LinearLayout.LayoutParams(-2, -2)
+            clp.setMargins(0, 0, dp(c, 8), 0)
+            chipRow.addView(chip, clp)
+        }
+        val newChip = tv(c, "＋ 새 리스트", 13f, true, "#8A55D8")
+        newChip.background = shape(c, "#EFE8FB", 18)
+        newChip.setPadding(dp(c, 14), dp(c, 8), dp(c, 14), dp(c, 8))
+        newChip.setOnClickListener {
+            val e = EditText(c)
+            e.hint = "리스트 이름 (예: 운동, 출근길)"
+            AlertDialog.Builder(c)
+                .setTitle("새 플레이리스트")
+                .setView(e)
+                .setPositiveButton("만들기") { _, _ ->
+                    val nm = clean(e.text.toString())
+                    if (nm.isNotEmpty() && nm != "전체" && !names.contains(nm)) {
+                        names.add(nm)
+                        saveLists(c, names)
+                        current = nm
+                    }
+                    refresh(c, sv)
+                }
+                .setNegativeButton("취소", null)
+                .show()
+        }
+        chipRow.addView(newChip)
+        val hlp = LinearLayout.LayoutParams(-1, -2)
+        hlp.setMargins(0, 0, 0, dp(c, 12))
+        root.addView(hs, hlp)
+
+        if (current != "전체") {
+            val delList = tv(c, "이 리스트 삭제 (곡은 전체로 이동)", 12f, false, "#E0526F")
+            delList.setPadding(0, 0, 0, dp(c, 8))
+            delList.setOnClickListener {
+                names.remove(current)
+                saveLists(c, names)
+                val moved = ArrayList<String>()
+                for (s in all) {
+                    val q = s.split("|")
+                    if (q.size > 2 && q[2] == current) {
+                        moved.add(q[0] + "|" + q[1] + "|")
+                    } else {
+                        moved.add(s)
+                    }
+                }
+                save(c, moved)
+                current = "전체"
+                refresh(c, sv)
+            }
+            root.addView(delList)
+        }
 
         val form = LinearLayout(c)
         form.orientation = LinearLayout.VERTICAL
         form.background = shape(c, "#FFFFFF", 18)
         form.elevation = dp(c, 3).toFloat()
         form.setPadding(dp(c, 14), dp(c, 14), dp(c, 14), dp(c, 14))
-        form.addView(tv(c, "듣고 싶은 음악 저장", 15f, true, "#222222"))
+        form.addView(tv(c, "직접 추가 (" + current + ")", 15f, true, "#222222"))
         val tIn = input(c, "곡 제목 / 가수")
         val lIn = input(c, "링크 (선택, 없으면 유튜브 검색)")
         val ilp = LinearLayout.LayoutParams(-1, -2)
@@ -216,29 +334,35 @@ object MusicView {
         flp.setMargins(0, 0, 0, dp(c, 14))
         root.addView(form, flp)
 
-        val list = load(c)
         add.setOnClickListener {
             val t = clean(tIn.text.toString())
             val l = clean(lIn.text.toString())
             if (t.isEmpty()) {
                 Toast.makeText(c, "곡 제목을 입력하세요", Toast.LENGTH_SHORT).show()
             } else {
-                list.add(0, t + "|" + l)
-                save(c, list)
+                val l2 = load(c)
+                l2.add(0, t + "|" + l + "|" + (if (current == "전체") "" else current))
+                save(c, l2)
                 refresh(c, sv)
             }
         }
 
-        if (list.isEmpty()) {
-            val none = tv(c, "저장된 음악이 없어요.\n듣고 싶은 곡을 적어 보세요.", 14f, false, "#8895A7")
+        var shown = 0
+        for (i in all.indices) {
+            val q = all[i].split("|")
+            val group = if (q.size > 2) q[2] else ""
+            if (current == "전체" || group == current) {
+                val lp = LinearLayout.LayoutParams(-1, -2)
+                lp.setMargins(0, dp(c, 6), 0, dp(c, 6))
+                root.addView(item(c, sv, i, all), lp)
+                shown++
+            }
+        }
+        if (shown == 0) {
+            val none = tv(c, "이 리스트에 곡이 없어요.\n폰 음악을 불러오거나 직접 추가해 보세요.", 14f, false, "#8895A7")
             none.gravity = Gravity.CENTER
             none.setPadding(0, dp(c, 24), 0, 0)
             root.addView(none)
-        }
-        for (i in list.indices) {
-            val lp = LinearLayout.LayoutParams(-1, -2)
-            lp.setMargins(0, dp(c, 6), 0, dp(c, 6))
-            root.addView(item(c, sv, i, list[i], list), lp)
         }
         return sv
     }
