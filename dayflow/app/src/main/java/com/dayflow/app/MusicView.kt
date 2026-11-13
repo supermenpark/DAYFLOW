@@ -100,21 +100,6 @@ object MusicView {
         }
     }
 
-    private fun openMusicApp(c: Context) {
-        try {
-            val i = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC)
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            c.startActivity(i)
-            Toast.makeText(
-                c,
-                "곡을 고른 뒤 '공유 → DAYFLOW'를 누르면 저장돼요",
-                Toast.LENGTH_LONG
-            ).show()
-        } catch (e: Exception) {
-            Toast.makeText(c, "기본 음악 앱을 찾지 못했어요", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     private fun refresh(c: Context, sv: ScrollView) {
         val p = sv.parent
         if (p is ViewGroup) {
@@ -201,8 +186,9 @@ object MusicView {
         val l2 = load(c)
         val target = if (current == "전체") "" else current
         for (s in picked.reversed()) {
-            l2.add(0, s.replace("|", "|").let { it.substringBefore("|") + "|" +
-                it.substringAfter("|").replace("|", "%7C") + "|" + target })
+            val name = s.substringBefore("|")
+            val uri = s.substringAfter("|").replace("|", "%7C")
+            l2.add(0, name + "|" + uri + "|" + target)
         }
         save(c, l2)
         Toast.makeText(c, picked.size.toString() + "곡 저장됨", Toast.LENGTH_SHORT).show()
@@ -219,51 +205,33 @@ object MusicView {
 
         root.addView(tv(c, "🎵 음악", 30f, true, "#0F2A55"))
 
-        val row = LinearLayout(c)
-        row.orientation = LinearLayout.HORIZONTAL
-        val b1 = pill(c, "내 뮤직 열기", "#B58CF0", "#7C4DDB")
-        b1.setOnClickListener { openMusicApp(c) }
-        val l1 = LinearLayout.LayoutParams(0, -2, 1f)
-        l1.setMargins(0, 0, dp(c, 6), 0)
-        row.addView(b1, l1)
-        val b2 = pill(c, "유튜브 뮤직", "#FF8A9B", "#E0526F")
-        b2.setOnClickListener { open(c, "", "https://music.youtube.com") }
-        val l2 = LinearLayout.LayoutParams(0, -2, 1f)
-        l2.setMargins(dp(c, 6), 0, 0, 0)
-        row.addView(b2, l2)
-        val rlp = LinearLayout.LayoutParams(-1, -2)
-        rlp.setMargins(0, dp(c, 16), 0, dp(c, 12))
-        root.addView(row, rlp)
-
         val all = load(c)
         val names = lists(c)
 
-        val pickBtn = pill(c, "📂  폰 음악 목록에서 담기 (여러 곡 선택)", "#7BD3A0", "#2FA866")
+        val pickBtn = pill(c, "📂  폰 음악에서 담기", "#B58CF0", "#7C4DDB")
         pickBtn.setOnClickListener {
             val a = c as Activity
-            if (!LocalMusic.granted(a)) {
-                LocalMusic.ask(a)
-                Toast.makeText(
-                    c,
-                    "허용 창에서 '허용'을 누른 뒤 이 버튼을 다시 눌러 주세요",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else {
+            val openList = {
                 LocalMusic.pick(a) { picked ->
-                    if (picked.isEmpty()) {
-                        // 목록이 비었거나 선택이 없으면 파일 선택 화면으로 대체
-                        val i = Intent(c, PickActivity::class.java)
-                        i.putExtra("group", if (current == "전체") "" else current)
-                        c.startActivity(i)
-                    } else {
-                        addPicked(c, sv, picked)
-                    }
+                    if (picked.isNotEmpty()) addPicked(c, sv, picked)
                 }
+            }
+            if (!LocalMusic.granted(a)) {
+                Toast.makeText(c, "음악 접근을 '허용'해 주세요", Toast.LENGTH_LONG).show()
+                LocalMusic.ask(a) { openList() }
+            } else {
+                openList()
             }
         }
         val plp2 = LinearLayout.LayoutParams(-1, -2)
-        plp2.setMargins(0, 0, 0, dp(c, 12))
+        plp2.setMargins(0, dp(c, 16), 0, dp(c, 10))
         root.addView(pickBtn, plp2)
+
+        val yt = pill(c, "유튜브 뮤직 열기", "#FF8A9B", "#E0526F")
+        yt.setOnClickListener { open(c, "", "https://music.youtube.com") }
+        val ylp = LinearLayout.LayoutParams(-1, -2)
+        ylp.setMargins(0, 0, 0, dp(c, 12))
+        root.addView(yt, ylp)
 
         val chipRow = LinearLayout(c)
         chipRow.orientation = LinearLayout.HORIZONTAL
@@ -379,7 +347,7 @@ object MusicView {
             }
         }
         if (shown == 0) {
-            val none = tv(c, "이 리스트에 곡이 없어요.\n폰 음악을 담거나, 음악 앱에서 공유로 보내 보세요.", 14f, false, "#8895A7")
+            val none = tv(c, "이 리스트에 곡이 없어요.\n'폰 음악에서 담기'를 눌러 보세요.", 14f, false, "#8895A7")
             none.gravity = Gravity.CENTER
             none.setPadding(0, dp(c, 24), 0, 0)
             root.addView(none)
