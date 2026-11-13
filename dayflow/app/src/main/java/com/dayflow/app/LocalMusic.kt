@@ -5,13 +5,18 @@ import android.app.AlertDialog
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.widget.Toast
 
 object LocalMusic {
 
     const val REQ = 88
+
+    // 권한 허용 직후 이어서 실행할 동작
+    var pending: (() -> Unit)? = null
 
     fun permission(): String {
         return if (Build.VERSION.SDK_INT >= 33) {
@@ -22,11 +27,21 @@ object LocalMusic {
     }
 
     fun granted(a: Activity): Boolean {
-        return a.checkSelfPermission(permission()) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        return a.checkSelfPermission(permission()) == PackageManager.PERMISSION_GRANTED
     }
 
-    fun ask(a: Activity) {
+    fun ask(a: Activity, then: () -> Unit) {
+        pending = then
         a.requestPermissions(arrayOf(permission()), REQ)
+    }
+
+    fun onResult(requestCode: Int, grantResults: IntArray) {
+        if (requestCode == REQ) {
+            val ok = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            val p = pending
+            pending = null
+            if (ok && p != null) p()
+        }
     }
 
     fun list(c: Context): List<String> {
@@ -38,25 +53,28 @@ object LocalMusic {
             MediaStore.Audio.Media.ARTIST
         )
         val sel = MediaStore.Audio.Media.IS_MUSIC + " != 0"
-        val cur = c.contentResolver.query(
-            uri, cols, sel, null, MediaStore.Audio.Media.TITLE + " ASC"
-        ) ?: return out
-        while (cur.moveToNext() && out.size < 800) {
-            val id = cur.getLong(0)
-            val title = (cur.getString(1) ?: "").replace("|", " ")
-            val artist = (cur.getString(2) ?: "").replace("|", " ")
-            val u = ContentUris.withAppendedId(uri, id)
-            val name = if (artist.isEmpty() || artist == "<unknown>") title else title + " - " + artist
-            out.add(name + "|" + u.toString())
+        try {
+            val cur = c.contentResolver.query(
+                uri, cols, sel, null, MediaStore.Audio.Media.TITLE + " ASC"
+            ) ?: return out
+            while (cur.moveToNext() && out.size < 1000) {
+                val id = cur.getLong(0)
+                val title = (cur.getString(1) ?: "").replace("|", " ")
+                val artist = (cur.getString(2) ?: "").replace("|", " ")
+                val u = ContentUris.withAppendedId(uri, id)
+                val name = if (artist.isEmpty() || artist == "<unknown>") title else title + " - " + artist
+                out.add(name + "|" + u.toString())
+            }
+            cur.close()
+        } catch (e: Exception) {
         }
-        cur.close()
         return out
     }
 
     fun pick(a: Activity, done: (List<String>) -> Unit) {
         val items = list(a)
         if (items.isEmpty()) {
-            done(ArrayList())
+            Toast.makeText(a, "폰에서 음악을 찾지 못했어요. 음악 파일이 있는지 확인해 주세요.", Toast.LENGTH_LONG).show()
             return
         }
         val names = Array(items.size) { items[it].substringBefore("|") }
