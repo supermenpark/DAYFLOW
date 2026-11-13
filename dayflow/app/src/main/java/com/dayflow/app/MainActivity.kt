@@ -71,7 +71,10 @@ class MainActivity : Activity() {
             }
         }
     }
-
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        LocalMusic.onResult(requestCode, grantResults)
+    }
     override fun onResume() {
         super.onResume()
         if (ready) {
