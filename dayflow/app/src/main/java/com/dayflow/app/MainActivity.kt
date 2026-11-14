@@ -247,6 +247,20 @@ class MainActivity : Activity() {
     }
 
     private fun show(i: Int) {
+    cur = i
+    pages.removeAllViews()
+    val v: View = when (i) {
+        0 -> buildHome()
+        1 -> MemoView.build(this)
+        2 -> MusicView.build(this)
+        3 -> DiaryView.build(this)
+        else -> buildMy()
+    }
+    pages.addView(v, FrameLayout.LayoutParams(-1, -1))
+    for (j in 0..4) {
+        tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
+    }
+    }
         cur = i
         pages.removeAllViews()
         val v: View = when (i) {
