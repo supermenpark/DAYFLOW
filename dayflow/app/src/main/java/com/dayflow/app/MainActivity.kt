@@ -1,3 +1,4 @@
+
 package com.dayflow.app
 
 import android.app.Activity
@@ -71,21 +72,32 @@ class MainActivity : Activity() {
             }
         }
     }
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         LocalMusic.onResult(requestCode, grantResults)
     }
+
     override fun onResume() {
         super.onResume()
         if (ready) {
             show(cur)
-            Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
+            Weather.refresh(this) {
+                runOnUiThread {
+                    if (cur == 0) show(0)
+                }
+            }
         }
     }
 
     private fun banner(): View {
         val box = FrameLayout(this)
         val bgd = BgImage.drawable(this)
+
         if (bgd != null) {
             val iv = ImageView(this)
             iv.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -94,22 +106,30 @@ class MainActivity : Activity() {
         } else {
             val g = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#7EC8F5"), Color.parseColor("#CDE9FA"))
+                intArrayOf(
+                    Color.parseColor("#7EC8F5"),
+                    Color.parseColor("#CDE9FA")
+                )
             )
             box.background = g
         }
+
         val col = LinearLayout(this)
         col.orientation = LinearLayout.VERTICAL
         col.setPadding(dp(20), dp(40), dp(20), 0)
+
         val t1 = label("DAYFLOW", 28f, true)
         t1.setTextColor(Color.WHITE)
         t1.setShadowLayer(6f, 0f, 2f, Color.parseColor("#66000000"))
+
         val t2 = label("오늘도, 더 나은 하루를 위해", 14f, false)
         t2.setTextColor(Color.WHITE)
         t2.setShadowLayer(6f, 0f, 2f, Color.parseColor("#66000000"))
+
         col.addView(t1)
         col.addView(t2)
         box.addView(col, FrameLayout.LayoutParams(-1, -2))
+
         return box
     }
 
@@ -118,6 +138,7 @@ class MainActivity : Activity() {
         val y = now.get(Calendar.YEAR)
         val m = now.get(Calendar.MONTH) + 1
         val d = now.get(Calendar.DAY_OF_MONTH)
+
         val card = LinearLayout(this)
         card.orientation = LinearLayout.HORIZONTAL
         card.gravity = Gravity.CENTER_VERTICAL
@@ -132,19 +153,24 @@ class MainActivity : Activity() {
         val f = LinearLayout(this)
         f.orientation = LinearLayout.VERTICAL
         f.gravity = Gravity.END
+
         val a = label("오늘의 운세", 13f, false)
         a.setTextColor(Color.parseColor("#666666"))
+
         val b = label(Fortune.score(y, m, d, 0).toString() + "점", 24f, true)
         b.setTextColor(Color.parseColor("#6A3DE8"))
+
         f.addView(a)
         f.addView(b)
         card.addView(f, LinearLayout.LayoutParams(-2, -2))
+
         return card
     }
 
     private fun buildHome(): View {
         val sv = ScrollView(this)
         sv.setBackgroundColor(Color.parseColor("#F4F7FB"))
+
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         sv.addView(root)
@@ -160,31 +186,38 @@ class MainActivity : Activity() {
         val head = LinearLayout(this)
         head.orientation = LinearLayout.HORIZONTAL
         head.gravity = Gravity.CENTER_VERTICAL
+
         val prev = label("‹", 28f, true)
         prev.gravity = Gravity.CENTER
         prev.setPadding(dp(16), 0, dp(16), 0)
         head.addView(prev)
+
         monthTitle = label("", 20f, true)
         monthTitle.gravity = Gravity.CENTER
         monthTitle.setTextColor(Color.parseColor("#222222"))
         head.addView(monthTitle, wrap())
+
         val next = label("›", 28f, true)
         next.gravity = Gravity.CENTER
         next.setPadding(dp(16), 0, dp(16), 0)
         head.addView(next)
+
         cal.addView(head)
 
         val week = LinearLayout(this)
         week.orientation = LinearLayout.HORIZONTAL
         val names = arrayOf("일", "월", "화", "수", "목", "금", "토")
+
         for (i in 0..6) {
             var color = "#444444"
             if (i == 0) color = "#E53935"
             if (i == 6) color = "#1976D2"
+
             val w = cellText(names[i], 13f, color, true)
             w.setPadding(0, dp(10), 0, dp(10))
             week.addView(w, wrap())
         }
+
         cal.addView(week)
 
         gridBox = LinearLayout(this)
@@ -199,6 +232,7 @@ class MainActivity : Activity() {
             }
             drawMonth()
         }
+
         next.setOnClickListener {
             month += 1
             if (month > 12) {
@@ -225,7 +259,9 @@ class MainActivity : Activity() {
         root.orientation = LinearLayout.VERTICAL
         root.setBackgroundColor(Color.parseColor("#F4F7FB"))
         root.setPadding(dp(20), dp(48), dp(20), dp(20))
+
         root.addView(label("MY", 26f, true))
+
         val pick = Button(this)
         pick.text = "배너 사진 선택"
         pick.setOnClickListener {
@@ -235,6 +271,7 @@ class MainActivity : Activity() {
         }
         Ui.style(this, pick, 0)
         root.addView(pick)
+
         val clear = Button(this)
         clear.text = "배너 사진 지우기"
         clear.setOnClickListener {
@@ -243,35 +280,28 @@ class MainActivity : Activity() {
         }
         Ui.style(this, clear, 4)
         root.addView(clear)
+
         return root
     }
 
     private fun show(i: Int) {
-    cur = i
-    pages.removeAllViews()
-    val v: View = when (i) {
-        0 -> buildHome()
-        1 -> MemoView.build(this)
-        2 -> MusicView.build(this)
-        3 -> DiaryView.build(this)
-        else -> buildMy()
-    }
-    pages.addView(v, FrameLayout.LayoutParams(-1, -1))
-    for (j in 0..4) {
-        tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
-    }
-    }
         cur = i
         pages.removeAllViews()
+
         val v: View = when (i) {
             0 -> buildHome()
             1 -> MemoView.build(this)
             2 -> MusicView.build(this)
+            3 -> DiaryView.build(this)
             else -> buildMy()
         }
+
         pages.addView(v, FrameLayout.LayoutParams(-1, -1))
-        for (j in 0..3) {
-            tabs[j].setTextColor(Color.parseColor(if (j == i) "#1976D2" else "#888888"))
+
+        for (j in 0..4) {
+            tabs[j].setTextColor(
+                Color.parseColor(if (j == i) "#1976D2" else "#888888")
+            )
         }
     }
 
@@ -280,6 +310,7 @@ class MainActivity : Activity() {
 
         val crashPrefs = getSharedPreferences("crash", MODE_PRIVATE)
         val crash = crashPrefs.getString("msg", null)
+
         if (crash != null) {
             crashPrefs.edit().clear().commit()
             val tv = TextView(this)
@@ -288,6 +319,7 @@ class MainActivity : Activity() {
             setContentView(tv)
             return
         }
+
         Thread.setDefaultUncaughtExceptionHandler { _, e ->
             val st = e.stackTrace.take(8).joinToString("\n")
             getSharedPreferences("crash", MODE_PRIVATE).edit()
@@ -296,7 +328,10 @@ class MainActivity : Activity() {
         }
 
         if (Build.VERSION.SDK_INT >= 33) {
-            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
+            requestPermissions(
+                arrayOf("android.permission.POST_NOTIFICATIONS"),
+                1
+            )
         }
 
         val now = Calendar.getInstance()
@@ -309,9 +344,18 @@ class MainActivity : Activity() {
         bar.orientation = LinearLayout.HORIZONTAL
         bar.setBackgroundColor(Color.WHITE)
         bar.elevation = dp(8).toFloat()
-        val tabNames = arrayOf("🏠\n홈", "📝\n메모", "🎵\n음악", "👤\nMY")
+
+        val tabNames = arrayOf(
+            "🏠\n홈",
+            "📝\n메모",
+            "🎵\n음악",
+            "📖\n다이어리",
+            "👤\nMY"
+        )
+
         tabs = ArrayList()
-        for (i in 0..3) {
+
+        for (i in 0..4) {
             val t = label(tabNames[i], 12f, true)
             t.gravity = Gravity.CENTER
             t.setPadding(0, dp(8), 0, dp(8))
@@ -328,7 +372,12 @@ class MainActivity : Activity() {
 
         ready = true
         show(0)
-        Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
+
+        Weather.refresh(this) {
+            runOnUiThread {
+                if (cur == 0) show(0)
+            }
+        }
     }
 
     private fun drawMonth() {
@@ -337,6 +386,7 @@ class MainActivity : Activity() {
 
         val first = Calendar.getInstance()
         first.set(year, month - 1, 1, 12, 0, 0)
+
         val startOffset = first.get(Calendar.DAY_OF_WEEK) - 1
         val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
 
@@ -346,18 +396,22 @@ class MainActivity : Activity() {
         val td = today.get(Calendar.DAY_OF_MONTH)
 
         var day = 1 - startOffset
+
         while (day <= daysInMonth) {
             val row = LinearLayout(this)
             row.orientation = LinearLayout.HORIZONTAL
+
             for (col in 0..6) {
                 val cell = LinearLayout(this)
                 cell.orientation = LinearLayout.VERTICAL
                 cell.gravity = Gravity.CENTER_HORIZONTAL
                 cell.setPadding(0, dp(6), 0, dp(6))
+
                 if (day in 1..daysInMonth) {
                     val d = day
                     val holiday = CalData.holidayOf(year, month, d)
                     val isToday = year == ty && month == tm && d == td
+
                     var color = "#222222"
                     if (col == 0 || holiday != null) color = "#E53935"
                     else if (col == 6) color = "#1976D2"
@@ -368,11 +422,23 @@ class MainActivity : Activity() {
                     val wcolor = if (isToday) "#FFFFFF" else "#1976D2"
                     val scolor = if (isToday) "#FFFFFF" else "#7A5AE0"
 
-                    cell.addView(cellText(d.toString() + " " + dot, 15f, color, true))
-                    cell.addView(cellText(Weather.label(this, year, month, d), 10f, wcolor, false))
-                    cell.addView(cellText(Fortune.score(year, month, d, 0).toString() + "점", 10f, scolor, false))
+                    cell.addView(
+                        cellText(d.toString() + " " + dot, 15f, color, true)
+                    )
+                    cell.addView(
+                        cellText(Weather.label(this, year, month, d), 10f, wcolor, false)
+                    )
+                    cell.addView(
+                        cellText(
+                            Fortune.score(year, month, d, 0).toString() + "점",
+                            10f,
+                            scolor,
+                            false
+                        )
+                    )
 
                     if (isToday) cell.background = round("#2F7BE8", 12)
+
                     cell.setOnClickListener {
                         val i = Intent(this, DayActivity::class.java)
                         i.putExtra("y", year)
@@ -381,9 +447,11 @@ class MainActivity : Activity() {
                         startActivity(i)
                     }
                 }
+
                 row.addView(cell, wrap())
                 day += 1
             }
+
             gridBox.addView(row)
         }
     }
