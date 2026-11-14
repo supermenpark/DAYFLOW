@@ -73,6 +73,7 @@ object DiaryView {
 
         val prev = Button(c)
         prev.text = "〈 이전 날"
+
         val next = Button(c)
         next.text = "다음 날 〉"
 
@@ -84,7 +85,10 @@ object DiaryView {
         paper.orientation = LinearLayout.VERTICAL
         paper.background = background("#FFFCF5", 18, c)
         paper.elevation = dp(c, 3).toFloat()
-        paper.setPadding(dp(c, 18), dp(c, 20), dp(c, 18), dp(c, 20))
+        paper.setPadding(
+            dp(c, 18), dp(c, 20),
+            dp(c, 18), dp(c, 20)
+        )
 
         paper.addView(text(c, "오늘의 기록", 19f, true, "#5A4938"))
 
@@ -95,7 +99,10 @@ object DiaryView {
         memo.textSize = 16f
         memo.setTextColor(Color.parseColor("#514438"))
         memo.setHintTextColor(Color.parseColor("#B6AA9A"))
-        memo.setPadding(dp(c, 8), dp(c, 16), dp(c, 8), dp(c, 16))
+        memo.setPadding(
+            dp(c, 8), dp(c, 16),
+            dp(c, 8), dp(c, 16)
+        )
         memo.background = null
 
         paper.addView(memo)
@@ -127,9 +134,17 @@ object DiaryView {
         )
 
         for (item in info) {
-            val card = text(c, item + "\n준비 중인 다이어리 공간", 15f, true, "#786653")
+            val card = text(
+                c,
+                item + "\n준비 중인 다이어리 공간",
+                15f, true, "#786653"
+            )
             card.background = background("#FFFCF5", 16, c)
-            card.setPadding(dp(c, 16), dp(c, 18), dp(c, 16), dp(c, 18))
+            card.setPadding(
+                dp(c, 16), dp(c, 18),
+                dp(c, 16), dp(c, 18)
+            )
+
             val p = LinearLayout.LayoutParams(-1, -2)
             p.setMargins(0, dp(c, 5), 0, dp(c, 7))
             root.addView(card, p)
@@ -158,7 +173,11 @@ object DiaryView {
                 .putString(key(), memo.text.toString())
                 .apply()
 
-            Toast.makeText(c, "오늘의 기록을 저장했어요", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                c,
+                "오늘의 기록을 저장했어요",
+                Toast.LENGTH_SHORT
+            ).show()
         }
 
         load()
