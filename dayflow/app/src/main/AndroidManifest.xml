@@ -12,7 +12,8 @@
         android:maxSdkVersion="32" />
 
     <application
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/dayflow_logo"
+        android:roundIcon="@mipmap/dayflow_logo"
         android:label="DAYFLOW"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
