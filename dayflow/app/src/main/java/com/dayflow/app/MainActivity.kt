@@ -411,7 +411,7 @@ class MainActivity : Activity() {
             0 -> buildHome()
             1 -> MemoView.build(this)
             2 -> MusicView.build(this)
-            3 -> buildDiary()
+            3 -> DiaryView.build(this)
             else -> buildMy()
         }
 
