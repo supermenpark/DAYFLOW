@@ -478,7 +478,10 @@ class MainActivity : Activity() {
             val t = label(tabNames[i], 12f, true)
             t.gravity = Gravity.CENTER
             t.setPadding(0, dp(8), 0, dp(8))
-            bar.addView(t, wrap())
+            bar.addView(
+    t,
+    LinearLayout.LayoutParams(0, -2, 1f)
+)
             tabs.add(t)
             t.setOnClickListener { show(i) }
         }
