@@ -99,6 +99,7 @@ class MainActivity : Activity() {
     }
 
     private fun banner(): View {
+                val box = FrameLayout(this)
         val box = FrameLayout(this)
         val bgd = BgImage.drawable(this)
 
