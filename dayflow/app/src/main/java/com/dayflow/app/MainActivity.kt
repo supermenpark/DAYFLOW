@@ -395,3 +395,71 @@ class MainActivity : Activity() {
 
         val outer = LinearLayout(this)
         outer.orientation = LinearLayout.VERTICAL
+        outer.addView(pages, LinearLayout.LayoutParams(-1, 0, 1f))
+        val blp = LinearLayout.LayoutParams(-1, -2)
+        blp.setMargins(dp(10), 0, dp(10), dp(8))
+        outer.addView(bar, blp)
+        setContentView(outer)
+
+        ready = true
+        show(0)
+        Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
+    }
+
+    private fun drawMonth() {
+        monthTitle.text = year.toString() + "년 " + month + "월"
+        gridBox.removeAllViews()
+
+        val first = Calendar.getInstance()
+        first.set(year, month - 1, 1, 12, 0, 0)
+        val startOffset = first.get(Calendar.DAY_OF_WEEK) - 1
+        val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+        val today = Calendar.getInstance()
+        val ty = today.get(Calendar.YEAR)
+        val tm = today.get(Calendar.MONTH) + 1
+        val td = today.get(Calendar.DAY_OF_MONTH)
+
+        var day = 1 - startOffset
+        while (day <= daysInMonth) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            for (col in 0..6) {
+                val cell = LinearLayout(this)
+                cell.orientation = LinearLayout.VERTICAL
+                cell.gravity = Gravity.CENTER_HORIZONTAL
+                cell.setPadding(0, dp(6), 0, dp(6))
+                if (day in 1..daysInMonth) {
+                    val d = day
+                    val holiday = CalData.holidayOf(year, month, d)
+                    val isToday = year == ty && month == tm && d == td
+                    var color = "#222222"
+                    if (col == 0 || holiday != null) color = "#E53935"
+                    else if (col == 6) color = "#1976D2"
+                    if (isToday) color = "#FFFFFF"
+
+                    val hasEvent = Scheduler.loadEvents(this, year, month, d).isNotEmpty()
+                    val dot = if (hasEvent) "●" else " "
+                    val wcolor = if (isToday) "#FFFFFF" else "#1976D2"
+                    val scolor = if (isToday) "#FFFFFF" else "#7A5AE0"
+
+                    cell.addView(cellText(d.toString() + " " + dot, 15f, color, true))
+                    cell.addView(cellText(Weather.label(this, year, month, d), 10f, wcolor, false))
+                    cell.addView(cellText(Fortune.score(year, month, d, 0).toString() + "점", 10f, scolor, false))
+
+                    if (isToday) cell.background = round("#2F7BE8", 12)
+                    cell.setOnClickListener {
+                        val i = Intent(this, DayActivity::class.java)
+                        i.putExtra("y", year)
+                        i.putExtra("m", month)
+                        i.putExtra("d", d)
+                        startActivity(i)
+                    }
+                }
+                row.addView(cell, wrap())
+                day += 1
+            }
+            gridBox.addView(row)
+        }
+    }
+}
