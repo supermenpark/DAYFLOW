@@ -1,7 +1,7 @@
 package com.dayflow.app
 
 import android.app.Activity
-import android.content.Context
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -9,12 +9,9 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.text.InputType
 import android.view.Gravity
 import android.view.View
-import android.view.inputmethod.InputMethodManager
 import android.widget.Button
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -134,7 +131,7 @@ class MainActivity : Activity() {
         val f = LinearLayout(this)
         f.orientation = LinearLayout.VERTICAL
         f.gravity = Gravity.END
-        val a = label("오늘의 운세", 13f, false)
+        val a = label("오늘의 운세(재미용)", 13f, false)
         a.setTextColor(Color.parseColor("#666666"))
         val b = label(Fortune.score(y, m, d, 0).toString() + "점", 24f, true)
         b.setTextColor(Color.parseColor("#6A3DE8"))
@@ -222,113 +219,65 @@ class MainActivity : Activity() {
         return sv
     }
 
-    // 다이어리 화면
-    private fun buildDiary(): View {
+    private fun sectionTitle(root: LinearLayout, text: String) {
+        val t = label(text, 15f, true)
+        t.setTextColor(Color.parseColor("#26364A"))
+        val lp = LinearLayout.LayoutParams(-1, -2)
+        lp.setMargins(0, dp(22), 0, dp(6))
+        root.addView(t, lp)
+    }
+
+    private fun menuButton(root: LinearLayout, text: String, color: Int, action: () -> Unit) {
+        val b = Button(this)
+        b.text = text
+        Ui.style(this, b, color)
+        b.setOnClickListener { action() }
+        val lp = LinearLayout.LayoutParams(-1, -2)
+        lp.setMargins(0, dp(4), 0, dp(4))
+        root.addView(b, lp)
+    }
+
+    private fun buildMy(): View {
         val sv = ScrollView(this)
         sv.setBackgroundColor(Color.parseColor("#F4F7FB"))
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setPadding(dp(16), dp(24), dp(16), dp(30))
+        root.setPadding(dp(20), dp(48), dp(20), dp(30))
         sv.addView(root)
-
-        val title = label("나의 다이어리", 25f, true)
-        title.setTextColor(Color.parseColor("#26364A"))
-        root.addView(title)
-
-        val subtitle = label("오늘도 나만의 이야기를 기록해 보세요.", 13f, false)
-        subtitle.setTextColor(Color.parseColor("#888888"))
-        val subLp = LinearLayout.LayoutParams(-1, -2)
-        subLp.setMargins(0, dp(6), 0, dp(20))
-        root.addView(subtitle, subLp)
-
-        val now = Calendar.getInstance()
-        val y = now.get(Calendar.YEAR)
-        val m = now.get(Calendar.MONTH) + 1
-        val d = now.get(Calendar.DAY_OF_MONTH)
-        val dateKey = String.format("%04d-%02d-%02d", y, m, d)
-
-        val paper = LinearLayout(this)
-        paper.orientation = LinearLayout.VERTICAL
-        paper.background = round("#FFFEF5", 18)
-        paper.elevation = dp(4).toFloat()
-        paper.setPadding(dp(18), dp(20), dp(18), dp(20))
-        val paperLp = LinearLayout.LayoutParams(-1, -2)
-        paperLp.setMargins(0, 0, 0, dp(16))
-        root.addView(paper, paperLp)
-
-        val date = label("${y}년 ${m}월 ${d}일", 18f, true)
-        date.setTextColor(Color.parseColor("#4A6A91"))
-        paper.addView(date)
-
-        val line = View(this)
-        line.setBackgroundColor(Color.parseColor("#E8DFC8"))
-        val lineLp = LinearLayout.LayoutParams(-1, dp(1))
-        lineLp.setMargins(0, dp(14), 0, dp(14))
-        paper.addView(line, lineLp)
-
-        val diaryInput = EditText(this)
-        diaryInput.textSize = 16f
-        diaryInput.setTextColor(Color.parseColor("#333333"))
-        diaryInput.setHintTextColor(Color.parseColor("#AAAAAA"))
-        diaryInput.hint = "오늘 하루는 어땠나요?\n\n기억하고 싶은 일, 생각, 감정을 자유롭게 적어보세요."
-        diaryInput.gravity = Gravity.TOP or Gravity.START
-        diaryInput.minLines = 14
-        diaryInput.setPadding(dp(4), dp(8), dp(4), dp(8))
-        diaryInput.background = null
-        diaryInput.inputType = InputType.TYPE_CLASS_TEXT or
-            InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-
-        val prefs = getSharedPreferences("dayflow_diary", MODE_PRIVATE)
-        diaryInput.setText(prefs.getString(dateKey, ""))
-        paper.addView(diaryInput, LinearLayout.LayoutParams(-1, -2))
-
-        val save = Button(this)
-        save.text = "일기 저장하기"
-        Ui.style(this, save, 0)
-        save.setOnClickListener {
-            val content = diaryInput.text.toString()
-            prefs.edit().putString(dateKey, content).apply()
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.hideSoftInputFromWindow(diaryInput.windowToken, 0)
-            Toast.makeText(this, "오늘의 일기를 저장했어요.", Toast.LENGTH_SHORT).show()
-        }
-        root.addView(save, LinearLayout.LayoutParams(-1, dp(52)))
-
-        val info = label("소중한 하루하루가 모여 나만의 이야기가 됩니다.", 12f, false)
-        info.gravity = Gravity.CENTER
-        info.setTextColor(Color.parseColor("#999999"))
-        val infoLp = LinearLayout.LayoutParams(-1, -2)
-        infoLp.setMargins(0, dp(20), 0, 0)
-        root.addView(info, infoLp)
-
-        return sv
-    }
-
-    private fun buildMy(): View {
-        val root = LinearLayout(this)
-        root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(Color.parseColor("#F4F7FB"))
-        root.setPadding(dp(20), dp(48), dp(20), dp(20))
         root.addView(label("MY", 26f, true))
-        val pick = Button(this)
-        pick.text = "배너 사진 직접 선택"
-        pick.setOnClickListener {
+
+        sectionTitle(root, "날씨 지역")
+        menuButton(root, "📍 " + Weather.names[Weather.city(this)] + "  (눌러서 변경)", 1) {
+            AlertDialog.Builder(this)
+                .setTitle("날씨 지역 선택")
+                .setItems(Weather.names) { _, which ->
+                    Weather.setCity(this, which)
+                    Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
+                    show(4)
+                }
+                .show()
+        }
+
+        sectionTitle(root, "백업 (폰을 바꾸거나 앱을 지우기 전에)")
+        menuButton(root, "💾 백업 내보내기 (복사 + 공유)", 3) { Backup.export(this) }
+        menuButton(root, "📥 백업 불러오기", 2) { Backup.import(this) { show(4) } }
+
+        sectionTitle(root, "홈 배너")
+        menuButton(root, "배너 사진 직접 선택", 0) {
             val i = Intent(Intent.ACTION_GET_CONTENT)
             i.type = "image/*"
             startActivityForResult(i, 77)
         }
-        Ui.style(this, pick, 0)
-        root.addView(pick)
-        val clear = Button(this)
-        clear.text = "직접 고른 사진 지우기 (매일 랜덤 사진으로)"
-        clear.setOnClickListener {
+        menuButton(root, "직접 고른 사진 지우기 (매일 랜덤 사진으로)", 4) {
             BgImage.clear(this)
-            show(0)
+            show(4)
         }
-        Ui.style(this, clear, 4)
-        root.addView(clear)
-        return root
+
+        val note = label("운세 점수는 재미로 보는 샘플이에요.", 12f, false)
+        note.setTextColor(Color.parseColor("#8895A7"))
+        note.setPadding(0, dp(24), 0, 0)
+        root.addView(note)
+        return sv
     }
 
     private fun show(i: Int) {
@@ -338,7 +287,7 @@ class MainActivity : Activity() {
             0 -> buildHome()
             1 -> MemoView.build(this)
             2 -> MusicView.build(this)
-            3 -> buildDiary()
+            3 -> DiaryView.build(this)
             else -> buildMy()
         }
         pages.addView(v, FrameLayout.LayoutParams(-1, -1))
