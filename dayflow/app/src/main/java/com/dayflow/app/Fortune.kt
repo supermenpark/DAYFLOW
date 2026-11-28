@@ -17,6 +17,8 @@ object Fortune {
         "마음의 여유가 행운을 데려오는 날"
     )
     private val animals = arrayOf("원숭이", "닭", "개", "돼지", "쥐", "소", "호랑이", "토끼", "용", "뱀", "말", "양")
+    private val colors = arrayOf("파랑", "초록", "노랑", "보라", "분홍", "주황", "하양")
+    private val actions = arrayOf("가벼운 산책", "일찍 귀가하기", "오랜 친구에게 연락", "따뜻한 차 한 잔", "책상 정리", "감사 인사 전하기", "새로운 길로 가보기")
 
     private fun star(m: Int, d: Int): String {
         return when {
@@ -77,5 +79,24 @@ object Fortune {
 
     fun message(y: Int, m: Int, d: Int): String {
         return msgs[rnd(y, m, d, 55).nextInt(msgs.size)]
+    }
+
+    private fun money(s: Int): String {
+        return if (s >= 85) "수입의 기운이 좋아요" else if (s >= 72) "계획한 만큼만 쓰면 안정적이에요" else "충동구매는 한 번 더 생각해요"
+    }
+
+    private fun health(s: Int): String {
+        return if (s >= 85) "컨디션이 가벼운 날이에요" else if (s >= 72) "무리하지 않으면 괜찮아요" else "충분히 쉬고 물을 자주 마셔요"
+    }
+
+    // 오늘의 운세 한마디 (재미용)
+    fun today(y: Int, m: Int, d: Int): String {
+        val col = colors[rnd(y, m, d, 7).nextInt(colors.size)]
+        val act = actions[rnd(y, m, d, 8).nextInt(actions.size)]
+        return message(y, m, d) + "\n" +
+            "💰 " + money(score(y, m, d, 1)) + "\n" +
+            "💪 " + health(score(y, m, d, 4)) + "\n" +
+            "🎨 행운의 색 " + col + " · 🔢 행운의 숫자 " + lucky(y, m, d) + "\n" +
+            "👉 추천 행동: " + act
     }
 }
