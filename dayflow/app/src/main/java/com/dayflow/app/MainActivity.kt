@@ -2,6 +2,8 @@ package com.dayflow.app
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.DatePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -12,6 +14,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -82,6 +85,7 @@ class MainActivity : Activity() {
         super.onResume()
         if (ready) {
             show(cur)
+            WidgetProvider.refresh(this)
             Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
         }
     }
@@ -131,13 +135,31 @@ class MainActivity : Activity() {
         val f = LinearLayout(this)
         f.orientation = LinearLayout.VERTICAL
         f.gravity = Gravity.END
-        val a = label("오늘의 운세(재미용)", 13f, false)
+        val title = if (Fortune.label.isEmpty()) "오늘의 운세(재미용)" else Fortune.label
+        val a = label(title, 13f, false)
         a.setTextColor(Color.parseColor("#666666"))
         val b = label(Fortune.score(y, m, d, 0).toString() + "점", 24f, true)
         b.setTextColor(Color.parseColor("#6A3DE8"))
         f.addView(a)
         f.addView(b)
         card.addView(f, LinearLayout.LayoutParams(-2, -2))
+        return card
+    }
+
+    private fun briefCard(): View {
+        val card = LinearLayout(this)
+        card.orientation = LinearLayout.VERTICAL
+        card.background = round("#FFFFFF", 18)
+        card.elevation = dp(4).toFloat()
+        card.setPadding(dp(16), dp(14), dp(16), dp(14))
+        val h = label("📋 오늘의 브리핑", 15f, true)
+        h.setTextColor(Color.parseColor("#26364A"))
+        card.addView(h)
+        val b = label(Extra.brief(this), 14f, false)
+        b.setTextColor(Color.parseColor("#333333"))
+        b.setLineSpacing(0f, 1.2f)
+        b.setPadding(0, dp(6), 0, 0)
+        card.addView(b)
         return card
     }
 
@@ -212,8 +234,12 @@ class MainActivity : Activity() {
         root.addView(cal, lp)
 
         val lp2 = LinearLayout.LayoutParams(-1, -2)
-        lp2.setMargins(dp(12), 0, dp(12), dp(20))
+        lp2.setMargins(dp(12), 0, dp(12), dp(12))
         root.addView(summaryCard(), lp2)
+
+        val lp3 = LinearLayout.LayoutParams(-1, -2)
+        lp3.setMargins(dp(12), 0, dp(12), dp(20))
+        root.addView(briefCard(), lp3)
 
         drawMonth()
         return sv
@@ -237,6 +263,42 @@ class MainActivity : Activity() {
         root.addView(b, lp)
     }
 
+    private fun addDday() {
+        val n = Calendar.getInstance()
+        DatePickerDialog(
+            this,
+            { _, yy, mm, dd ->
+                val e = EditText(this)
+                e.hint = "이름 (예: 여행, 시험)"
+                AlertDialog.Builder(this)
+                    .setTitle("D-day 이름")
+                    .setView(e)
+                    .setPositiveButton("저장") { _, _ ->
+                        val t = e.text.toString().trim()
+                        if (t.isNotEmpty()) {
+                            Extra.ddaySet(this, yy, mm + 1, dd, t)
+                            show(4)
+                        }
+                    }
+                    .setNegativeButton("취소", null)
+                    .show()
+            },
+            n.get(Calendar.YEAR), n.get(Calendar.MONTH), n.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    private fun pickBirth() {
+        DatePickerDialog(
+            this,
+            { _, yy, mm, dd ->
+                Fortune.setBirth(this, yy, mm + 1, dd)
+                WidgetProvider.refresh(this)
+                show(4)
+            },
+            1990, 0, 1
+        ).show()
+    }
+
     private fun buildMy(): View {
         val sv = ScrollView(this)
         sv.setBackgroundColor(Color.parseColor("#F4F7FB"))
@@ -245,6 +307,18 @@ class MainActivity : Activity() {
         root.setPadding(dp(20), dp(48), dp(20), dp(30))
         sv.addView(root)
         root.addView(label("MY", 26f, true))
+
+        sectionTitle(root, "내 운세 (생일을 넣으면 띠·별자리 운세로 바뀌어요)")
+        val prof = if (Fortune.label.isEmpty()) "생일 미등록" else Fortune.label
+        val pt = label(prof, 13f, false)
+        pt.setTextColor(Color.parseColor("#6A3DE8"))
+        root.addView(pt)
+        menuButton(root, "🎂 생일 입력", 3) { pickBirth() }
+        menuButton(root, "생일 지우기", 4) {
+            Fortune.clearBirth(this)
+            WidgetProvider.refresh(this)
+            show(4)
+        }
 
         sectionTitle(root, "날씨 지역")
         menuButton(root, "📍 " + Weather.names[Weather.city(this)] + "  (눌러서 변경)", 1) {
@@ -256,6 +330,19 @@ class MainActivity : Activity() {
                     show(4)
                 }
                 .show()
+        }
+
+        sectionTitle(root, "D-day (달력에 📌 표시, 홈 브리핑에 남은 날)")
+        val nx = Extra.ddayNext(this)
+        if (nx != null) {
+            val t = label("다음: " + nx, 13f, false)
+            t.setTextColor(Color.parseColor("#2F7BE8"))
+            root.addView(t)
+        }
+        menuButton(root, "📌 D-day 등록", 2) { addDday() }
+        menuButton(root, "D-day 모두 지우기", 4) {
+            getSharedPreferences("dayflow_dday", Context.MODE_PRIVATE).edit().clear().apply()
+            show(4)
         }
 
         sectionTitle(root, "백업 (폰을 바꾸거나 앱을 지우기 전에)")
@@ -273,7 +360,7 @@ class MainActivity : Activity() {
             show(4)
         }
 
-        val note = label("운세 점수는 재미로 보는 샘플이에요.", 12f, false)
+        val note = label("운세 점수는 재미로 보는 샘플이에요.\n바탕화면 길게 누르기 → 위젯 → DAYFLOW에서 홈 위젯을 추가할 수 있어요.", 12f, false)
         note.setTextColor(Color.parseColor("#8895A7"))
         note.setPadding(0, dp(24), 0, 0)
         root.addView(note)
@@ -316,6 +403,8 @@ class MainActivity : Activity() {
             android.os.Process.killProcess(android.os.Process.myPid())
         }
 
+        Fortune.load(this)
+
         if (Build.VERSION.SDK_INT >= 33) {
             requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
         }
@@ -352,6 +441,7 @@ class MainActivity : Activity() {
 
         ready = true
         show(0)
+        WidgetProvider.refresh(this)
         Weather.refresh(this) { runOnUiThread { if (cur == 0) show(0) } }
     }
 
@@ -389,10 +479,11 @@ class MainActivity : Activity() {
 
                     val hasEvent = Scheduler.loadEvents(this, year, month, d).isNotEmpty()
                     val dot = if (hasEvent) "●" else " "
+                    val pin = if (Extra.ddayGet(this, year, month, d) != null) "📌" else ""
                     val wcolor = if (isToday) "#FFFFFF" else "#1976D2"
                     val scolor = if (isToday) "#FFFFFF" else "#7A5AE0"
 
-                    cell.addView(cellText(d.toString() + " " + dot, 15f, color, true))
+                    cell.addView(cellText(d.toString() + " " + dot + pin, 15f, color, true))
                     cell.addView(cellText(Weather.label(this, year, month, d), 10f, wcolor, false))
                     cell.addView(cellText(Fortune.score(year, month, d, 0).toString() + "점", 10f, scolor, false))
 
